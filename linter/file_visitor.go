@@ -17,10 +17,10 @@ const (
 )
 
 type fileVisitor struct {
-	nodes map[ast.Node]syntRecord
+	desc *pkgDesc
 }
 
-type syntRecord struct {
+type annotation struct {
 	object string
 	mutex  string
 	lock   int
@@ -62,11 +62,11 @@ func (cgv *commentGroupVisitor) Visit(node ast.Node) ast.Visitor {
 	return nil
 }
 
-func parseComments(comments *ast.CommentGroup) []syntRecord {
+func parseComments(comments *ast.CommentGroup) []annotation {
 	const (
 		tag = "synt:"
 	)
-	var result []syntRecord
+	var result []annotation
 	if comments == nil {
 		return result
 	}
@@ -87,13 +87,14 @@ func parseComments(comments *ast.CommentGroup) []syntRecord {
 	return result
 }
 
-func parseRecord(rec string) (syntRecord, error) {
-	var result syntRecord
+func parseRecord(rec string) (annotation, error) {
+	var result annotation
 	elems := strings.Split(rec, ":")
-	if len(elems) < 2 || len(elems) > 3 {
+	l := len(elems)
+	if l < 2 || l > 3 {
 		return result, errors.Errorf("invalid directive: %v", rec)
 	}
-	lockType := elems[len(elems)-1]
+	lockType := elems[l-1]
 	if lockType == "L" {
 		result.lock = lockTypeL
 	} else if lockType == "R" {
@@ -101,8 +102,8 @@ func parseRecord(rec string) (syntRecord, error) {
 	} else {
 		return result, errors.Errorf("invalid lock type: %s", lockType)
 	}
-	result.mutex = elems[len(elems)-2]
-	if len(elems) == 3 {
+	result.mutex = elems[l-2]
+	if l == 3 {
 		result.object = elems[0]
 	}
 	return result, nil

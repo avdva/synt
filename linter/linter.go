@@ -8,6 +8,21 @@ import (
 	"sort"
 )
 
+type methodDesc struct {
+	node        ast.Node
+	annotations []annotation
+}
+
+type typeDesc struct {
+	methods     map[string]methodDesc
+	annotations []annotation
+}
+
+type pkgDesc struct {
+	types   map[string]typeDesc
+	globals map[string]ast.Node
+}
+
 type Linter struct {
 	fs  *token.FileSet
 	pkg *ast.Package
@@ -27,9 +42,13 @@ func (l *Linter) Do() []Report {
 		allFiles = append(allFiles, name)
 	}
 	sort.Strings(allFiles)
+	desc := &pkgDesc{
+		types:   make(map[string]typeDesc),
+		globals: make(map[string]ast.Node),
+	}
 	for _, name := range allFiles {
 		file := l.pkg.Files[name]
-		fv := &fileVisitor{}
+		fv := &fileVisitor{desc}
 		fv.walk(file)
 	}
 	return nil
