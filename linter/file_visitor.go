@@ -5,7 +5,6 @@ package linter
 import (
 	"fmt"
 	"go/ast"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -33,33 +32,35 @@ func (fv *fileVisitor) walk(node ast.Node) {
 func (fv *fileVisitor) Visit(node ast.Node) ast.Visitor {
 	switch typed := node.(type) {
 	case *ast.FuncDecl:
-		println(reflect.TypeOf(typed.Recv.List[0].Type).String())
-		se := typed.Recv.List[0].Type.(*ast.StarExpr)
-		println(reflect.TypeOf(se.X).String())
-		id := se.X.(*ast.Ident)
-		println(id.Name)
-		parseComments(typed.Doc)
+		if typed.Recv == nil {
+			return nil
+		}
+		annotations := parseComments(typed.Doc)
+		var typName string
+		switch rec := typed.Recv.List[0].Type.(type) {
+		case *ast.StarExpr:
+			id := rec.X.(*ast.Ident)
+			typName = id.Name
+		case *ast.Ident:
+			typName = rec.Name
+		}
+		fv.desc.addTypeMethod(typName, typed.Name.Name, node, annotations)
 	case *ast.GenDecl:
 		if len(typed.Specs) == 1 {
-			if _, ok := typed.Specs[0].(*ast.TypeSpec); ok {
-				return &commentGroupVisitor{}
+			if ts, ok := typed.Specs[0].(*ast.TypeSpec); ok {
+				fv.desc.addTypeDesc(ts.Name.Name, ts, parseComments(typed.Doc))
 			}
 			return nil
 		}
 	case *ast.TypeSpec:
-		parseComments(typed.Doc)
+		if st, ok := typed.Type.(*ast.StructType); ok {
+			if typed.Name.Name == "Type3" {
+				fmt.Printf("%s %d %v\n", typed.Name.Name, len(st.Fields.List), st.Fields.List[0].Type)
+			}
+			fv.desc.addTypeDesc(typed.Name.Name, typed, parseComments(typed.Doc))
+		}
 	}
 	return fv
-}
-
-type commentGroupVisitor struct {
-}
-
-func (cgv *commentGroupVisitor) Visit(node ast.Node) ast.Visitor {
-	if gr, ok := node.(*ast.CommentGroup); ok {
-		parseComments(gr)
-	}
-	return nil
 }
 
 func parseComments(comments *ast.CommentGroup) []annotation {
@@ -89,7 +90,7 @@ func parseComments(comments *ast.CommentGroup) []annotation {
 
 func parseRecord(rec string) (annotation, error) {
 	var result annotation
-	elems := strings.Split(rec, ":")
+	elems := strings.Split(strings.TrimSpace(rec), ":")
 	l := len(elems)
 	if l < 2 || l > 3 {
 		return result, errors.Errorf("invalid directive: %v", rec)

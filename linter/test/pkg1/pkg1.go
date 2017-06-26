@@ -5,13 +5,15 @@ import (
 )
 
 // Type1 is a test struct.
-// synt: i:m:L, j:m:R, k:mut:L
 type Type1 struct {
-	m   sync.RWMutex
-	mut sync.Mutex
-
+	m sync.RWMutex
+	// synt: m:L
 	i int
+	// synt: m:R
 	j int64
+
+	mut sync.Mutex
+	// synt: mut:L
 	k float64
 }
 
@@ -23,11 +25,18 @@ type (
 	}
 	// Type3
 	Type3 struct {
-		a int
+		Type2
+	}
+	EmptyType struct {
 	}
 )
 
 // synt: t.m:L
 func (t *Type1) func1() {
+
+}
+
+// synt: t.m:L
+func (t Type1) func2() {
 
 }
