@@ -30,10 +30,9 @@ type pkgDesc struct {
 	globals map[string]ast.Node
 }
 
-func (d *pkgDesc) addTypeDesc(name string, node ast.Node, annotations []annotation) {
+func (d *pkgDesc) addTypeDesc(name string, node ast.Node) {
 	td := d.types[name]
 	td.node = node
-	td.annotations = annotations
 	d.types[name] = td
 }
 
