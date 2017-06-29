@@ -23,11 +23,6 @@ func TestLinterParseComments(t *testing.T) {
 	expected := &pkgDesc{
 		types: map[string]typeDesc{
 			"Type1": typeDesc{
-				annotations: []annotation{
-					annotation{"i", "m", lockTypeL},
-					annotation{"j", "m", lockTypeR},
-					annotation{"k", "mut", lockTypeL},
-				},
 				methods: map[string]methodDesc{
 					"func1": methodDesc{
 						annotations: []annotation{
@@ -47,19 +42,17 @@ func TestLinterParseComments(t *testing.T) {
 				},
 			},
 			"Type2": typeDesc{
-				annotations: []annotation{},
-				methods:     map[string]methodDesc{},
+				methods: map[string]methodDesc{},
 			},
 			"Type3": typeDesc{
-				annotations: []annotation{},
-				methods:     map[string]methodDesc{},
+				methods: map[string]methodDesc{},
 			},
 			"EmptyType": typeDesc{
-				annotations: []annotation{},
-				methods:     map[string]methodDesc{},
+				methods: map[string]methodDesc{},
 			},
 		},
 	}
+	debugPrintPkgDesc(actual)
 	a.NoError(comparePkgDesc(expected, actual))
 }
 
@@ -78,14 +71,6 @@ func comparePkgDesc(expected, actual *pkgDesc) error {
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {
-	if len(expected.annotations) != len(actual.annotations) {
-		return errors.Errorf("expected %d, got %d annotations", len(expected.annotations), len(actual.annotations))
-	}
-	for i, a := range expected.annotations {
-		if err := compareAnnotations(a, actual.annotations[i]); err != nil {
-			return err
-		}
-	}
 	if len(expected.methods) != len(actual.methods) {
 		return errors.Errorf("methods count mismatch, expected %d, got %d", len(expected.methods), len(actual.methods))
 	}

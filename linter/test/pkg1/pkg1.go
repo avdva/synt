@@ -14,7 +14,7 @@ type Type1 struct {
 
 	mut sync.Mutex
 	// synt: mut:L
-	k float64
+	k, l float64
 }
 
 // type block comment

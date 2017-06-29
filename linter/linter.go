@@ -3,49 +3,10 @@
 package linter
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"sort"
 )
-
-type methodDesc struct {
-	node        ast.Node
-	annotations []annotation
-}
-
-type fieldDesc struct {
-	node        ast.Node
-	annotations []annotation
-}
-
-type typeDesc struct {
-	node    ast.Node
-	methods map[string]methodDesc
-	fields  map[string]fieldDesc
-}
-
-type pkgDesc struct {
-	types   map[string]typeDesc
-	globals map[string]ast.Node
-}
-
-func (d *pkgDesc) addTypeDesc(name string, node ast.Node) {
-	td := d.types[name]
-	td.node = node
-	d.types[name] = td
-}
-
-func (d *pkgDesc) addTypeMethod(typName, methodName string, node ast.Node, annotations []annotation) {
-	td := d.types[typName]
-	if td.methods == nil {
-		td.methods = make(map[string]methodDesc)
-	}
-	td.methods[methodName] = methodDesc{
-		node:        node,
-		annotations: annotations,
-	}
-}
 
 type Linter struct {
 	fs  *token.FileSet
@@ -80,17 +41,6 @@ func (l *Linter) makePkgDesc() *pkgDesc {
 
 func (l *Linter) Do() []Report {
 	desc := l.makePkgDesc()
-	for name, td := range desc.types {
-		fmt.Printf("type %s\n", name)
-		for _, a := range td.annotations {
-			fmt.Printf("  annot = %v\n", a)
-		}
-		for name, m := range td.methods {
-			fmt.Printf("    method %s\n", name)
-			for _, a := range m.annotations {
-				fmt.Printf("      annot = %v\n", a)
-			}
-		}
-	}
+	debugPrintPkgDesc(desc)
 	return nil
 }
