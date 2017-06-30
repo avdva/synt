@@ -24,21 +24,18 @@ func TestLinterParseComments(t *testing.T) {
 		types: map[string]typeDesc{
 			"Type1": typeDesc{
 				methods: map[string]methodDesc{
-					"func1": methodDesc{
-						annotations: []annotation{
-							annotation{"", "t.m", lockTypeL},
-						},
-					},
+					"func1": methodDesc{},
 					"func2": methodDesc{
 						annotations: []annotation{
-							annotation{"", "t.m", lockTypeL},
+							annotation{"", "@m", lockTypeL},
 						},
 					},
 					"func3": methodDesc{
 						annotations: []annotation{
-							annotation{"", "t.m", lockTypeL},
+							annotation{"", "@m", lockTypeL},
 						},
 					},
+					"func4": methodDesc{},
 				},
 			},
 			"Type2": typeDesc{

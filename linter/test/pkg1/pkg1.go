@@ -31,12 +31,12 @@ type (
 	}
 )
 
-// synt: t.m:L
 func (t *Type1) func1() {
-
+	t.m.Lock()
+	t.func2()
 }
 
-// synt: t.m:L
+// synt: @m:L
 func (t Type1) func2() {
 
 }
