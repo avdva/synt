@@ -34,13 +34,14 @@ func (l *Linter) makePkgDesc() *pkgDesc {
 	fv := &fileVisitor{desc}
 	for _, name := range allFiles {
 		file := l.pkg.Files[name]
-		fv.walk(file)
+		ast.Walk(fv, file)
 	}
 	return desc
 }
 
 func (l *Linter) Do() []Report {
 	desc := l.makePkgDesc()
-	debugPrintPkgDesc(desc)
+	_ = desc
+	//debugPrintPkgDesc(desc)
 	return nil
 }

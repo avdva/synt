@@ -21,10 +21,6 @@ type annotation struct {
 	lock   int
 }
 
-func (fv *fileVisitor) walk(node ast.Node) {
-	ast.Walk(fv, node)
-}
-
 func (fv *fileVisitor) Visit(node ast.Node) ast.Visitor {
 	switch typed := node.(type) {
 	case *ast.FuncDecl:

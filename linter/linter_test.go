@@ -3,6 +3,7 @@
 package linter
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"testing"
@@ -50,7 +51,6 @@ func TestLinterParseComments(t *testing.T) {
 			},
 		},
 	}
-	debugPrintPkgDesc(actual)
 	a.NoError(comparePkgDesc(expected, actual))
 }
 
@@ -66,6 +66,26 @@ func comparePkgDesc(expected, actual *pkgDesc) error {
 		}
 	}
 	return nil
+}
+
+func TestFuncVisitor(t *testing.T) {
+	a := assert.New(t)
+	fs := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fs, "./test/pkg1", nil, parser.ParseComments)
+	if !a.NoError(err) {
+		return
+	}
+	l := New(fs, pkgs["pkg1"])
+	desc := l.makePkgDesc()
+	type1Desc, found := desc.types["Type1"]
+	if !a.True(found) {
+		return
+	}
+	func5Desc, found := type1Desc.methods["func5"]
+	if !a.True(found) {
+		return
+	}
+	ast.Walk(&funcVisitor{}, func5Desc.node)
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {
