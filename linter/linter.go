@@ -28,7 +28,7 @@ func (l *Linter) makePkgDesc() *pkgDesc {
 	}
 	sort.Strings(allFiles)
 	desc := &pkgDesc{
-		types:   make(map[string]typeDesc),
+		types:   make(map[string]*typeDesc),
 		globals: make(map[string]ast.Node),
 	}
 	fv := &fileVisitor{desc}

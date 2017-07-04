@@ -21,8 +21,8 @@ func TestLinterParseComments(t *testing.T) {
 	l := New(fs, pkgs["pkg1"])
 	actual := l.makePkgDesc()
 	expected := &pkgDesc{
-		types: map[string]typeDesc{
-			"Type1": typeDesc{
+		types: map[string]*typeDesc{
+			"Type1": &typeDesc{
 				methods: map[string]methodDesc{
 					"func1": methodDesc{},
 					"func2": methodDesc{
@@ -39,13 +39,13 @@ func TestLinterParseComments(t *testing.T) {
 					"func5": methodDesc{},
 				},
 			},
-			"Type2": typeDesc{
+			"Type2": &typeDesc{
 				methods: map[string]methodDesc{},
 			},
-			"Type3": typeDesc{
+			"Type3": &typeDesc{
 				methods: map[string]methodDesc{},
 			},
-			"EmptyType": typeDesc{
+			"EmptyType": &typeDesc{
 				methods: map[string]methodDesc{},
 			},
 		},
@@ -61,7 +61,7 @@ func comparePkgDesc(expected, actual *pkgDesc) error {
 	for k, v := range expected.types {
 		if td, found := actual.types[k]; !found {
 			return errors.Errorf("%s type not found", k)
-		} else if err := compareTypeDesc(&v, &td); err != nil {
+		} else if err := compareTypeDesc(v, td); err != nil {
 			return errors.Wrapf(err, "types %q don't match", k)
 		}
 	}
