@@ -36,6 +36,7 @@ func TestLinterParseComments(t *testing.T) {
 						},
 					},
 					"func4": methodDesc{},
+					"func5": methodDesc{},
 				},
 			},
 			"Type2": typeDesc{
