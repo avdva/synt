@@ -32,10 +32,13 @@ func (t *Type1) func5() {
 	} else if a == 6 {
 		defer t.m.RUnlock()
 	} else {
-
+		func() {
+			t.m.Lock()
+		}()
 	}
+	freeFunc()
 	select {
-	case <-(chan byte)(nil):
+	case <-chan byte(nil):
 	default:
 		t.m.RUnlock()
 	}

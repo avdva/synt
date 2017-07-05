@@ -40,3 +40,7 @@ func (t *Type1) func1() {
 func (t Type1) func2() {
 
 }
+
+func freeFunc() {
+
+}
