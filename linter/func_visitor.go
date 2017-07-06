@@ -54,6 +54,8 @@ func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 	case *ast.AssignStmt:
 		_ = typed
+	case *ast.IncDecStmt:
+		//		typed.
 	}
 	return nil
 }
@@ -69,7 +71,11 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 	for i := 0; i < fv.level; i++ {
 		print("  ")
 	}
-	println(reflect.TypeOf(node).String())
+	print(reflect.TypeOf(node).String())
+	if id, ok := node.(*ast.Ident); ok {
+		print(" = ", id.Name)
+	}
+	println()
 	switch typed := node.(type) {
 	case *ast.GoStmt:
 		ast.Walk(&printVisitor{level: fv.level + 1}, typed.Call)
@@ -78,13 +84,14 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 		ast.Walk(&printVisitor{level: fv.level + 1}, typed.Body)
 		return nil
 	case *ast.CallExpr:
-		for i := 0; i < fv.level+1; i++ {
-			print("  ")
-		}
-		//println(reflect.TypeOf(typed.Fun).String())
 		if sel, ok := typed.Fun.(*ast.SelectorExpr); ok {
-			ast.Walk(&printVisitor{level: fv.level + 1}, sel.Sel)
 			ast.Walk(&printVisitor{level: fv.level + 1}, sel.X)
+			ast.Walk(&printVisitor{level: fv.level + 1}, sel.Sel)
+		} else {
+			ast.Walk(&printVisitor{level: fv.level + 1}, typed.Fun)
+		}
+		for _, arg := range typed.Args {
+			ast.Walk(&printVisitor{level: fv.level + 1}, arg)
 		}
 		return nil
 	case *ast.IfStmt:

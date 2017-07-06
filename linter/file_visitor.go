@@ -6,19 +6,8 @@ import (
 	"go/ast"
 )
 
-const (
-	lockTypeL = iota
-	lockTypeR
-)
-
 type fileVisitor struct {
 	desc *pkgDesc
-}
-
-type annotation struct {
-	object string
-	mutex  string
-	lock   int
 }
 
 func (fv *fileVisitor) Visit(node ast.Node) ast.Visitor {

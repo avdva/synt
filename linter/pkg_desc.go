@@ -10,6 +10,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	lockTypeL = iota
+	lockTypeR
+)
+
+type annotation struct {
+	object string
+	mutex  string
+	lock   int
+}
+
 type methodDesc struct {
 	node        ast.Node
 	recvName    string
