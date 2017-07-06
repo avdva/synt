@@ -85,7 +85,7 @@ func TestFuncVisitor(t *testing.T) {
 	if !a.True(found) {
 		return
 	}
-	ast.Walk(&funcVisitor{}, func5Desc.node)
+	ast.Walk(&printVisitor{}, func5Desc.node)
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {
