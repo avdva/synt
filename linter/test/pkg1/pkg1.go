@@ -7,13 +7,13 @@ import (
 // Type1 is a test struct.
 type Type1 struct {
 	m sync.RWMutex
-	// synt: m:L
+	// synt: m.L
 	i int
-	// synt: m:R
+	// synt: m.R
 	j int64
 
 	mut sync.Mutex
-	// synt: mut:L
+	// synt: mut.L
 	k, l float64
 }
 
@@ -31,12 +31,13 @@ type (
 	}
 )
 
+// synt: !t.m.L
 func (t *Type1) func1() {
 	t.m.Lock()
 	t.func2()
 }
 
-// synt: @m:L
+// synt: t.m.L
 func (t Type1) func2() {
 
 }

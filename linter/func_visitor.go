@@ -5,6 +5,7 @@ package linter
 import (
 	"go/ast"
 	"reflect"
+	"strings"
 )
 
 const (
@@ -16,11 +17,64 @@ const (
 	mutStateMayLR
 )
 
+const (
+	exprRead = iota
+	exprWrite
+	exprExec
+)
+
 type state struct {
 	mut map[string]int
 }
 
+type syntChecker struct {
+	f   *methodDesc
+	pkg *pkgDesc
+	st  *state
+}
+
+func (sc *syntChecker) onExpr(op int, obj id) {
+	println("exec ", obj.String())
+	switch op {
+	case exprExec:
+
+	}
+}
+
+type stateChanger interface {
+	onExpr(op int, obj id)
+}
+
+type id struct {
+	parts []string
+}
+
+func idFromParts(parts ...string) id {
+	return id{parts: parts}
+}
+
+func (i *id) String() string {
+	return strings.Join(i.parts, ".")
+}
+
+func (i *id) eq(other id) bool {
+	if len(i.parts) != len(other.parts) {
+		return false
+	}
+	for i, p := range i.parts {
+		if p != other.parts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (i *id) last() string {
+	return i.parts[len(i.parts)-1]
+}
+
 type funcVisitor struct {
+	sc stateChanger
 }
 
 func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
@@ -31,31 +85,42 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.GoStmt:
 		return nil
 	case *ast.IfStmt, *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
-		_ = typed
 		return nil
 	default:
-		ast.Walk(&simpleVisitor{}, typed)
-		return nil
+		sv := &simpleVisitor{sc: fv.sc}
+		ast.Walk(sv, typed)
+		if sv.handled {
+			return nil
+		}
 	}
 	return fv
 }
 
 type simpleVisitor struct {
+	sc      stateChanger
+	handled bool
 }
 
 func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 	if node == nil {
 		return nil
 	}
+	sm.handled = true
 	switch typed := node.(type) {
 	case *ast.CallExpr:
 		for _, arg := range typed.Args {
 			ast.Walk(sm, arg)
 		}
+		if expanded := expandSel(typed.Fun); expanded != nil {
+			sm.sc.onExpr(exprExec, idFromParts(expanded...))
+		}
 	case *ast.AssignStmt:
-		_ = typed
 	case *ast.IncDecStmt:
 		//		typed.
+	case *ast.BinaryExpr:
+	//typed.
+	default:
+		sm.handled = false
 	}
 	return nil
 }
@@ -121,4 +186,18 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	}
 	return fv
+}
+
+func expandSel(node ast.Node) []string {
+	if sel, ok := node.(*ast.SelectorExpr); ok {
+		expanded := expandSel(sel.X)
+		if expanded == nil {
+			return nil
+		}
+		return append(expanded, []string{sel.Sel.Name}...)
+	} else if id, ok := node.(*ast.Ident); ok {
+		return []string{id.Name}
+	}
+	// TODO(avd) - support for nested CallExpr.
+	return nil
 }

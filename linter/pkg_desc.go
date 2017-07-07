@@ -16,9 +16,9 @@ const (
 )
 
 type annotation struct {
-	object string
-	mutex  string
-	lock   int
+	obj  id
+	lock int
+	not  bool
 }
 
 type methodDesc struct {
@@ -86,9 +86,6 @@ func (d *pkgDesc) addTypeSpec(node *ast.TypeSpec) {
 			return
 		}
 		for _, field := range typed.Fields.List {
-			if field.Doc == nil || len(field.Doc.Text()) == 0 {
-				continue
-			}
 			for _, name := range field.Names {
 				td.fields[name.Name] = fieldDesc{
 					node:        field,
@@ -99,30 +96,12 @@ func (d *pkgDesc) addTypeSpec(node *ast.TypeSpec) {
 	}
 }
 
-func debugPrintPkgDesc(desc *pkgDesc) {
-	for name, td := range desc.types {
-		fmt.Printf("type %s\n", name)
-		for name, f := range td.fields {
-			fmt.Printf("    field %s\n", name)
-			for _, a := range f.annotations {
-				fmt.Printf("      annot = %v\n", a)
-			}
-		}
-		for name, m := range td.methods {
-			fmt.Printf("    method %s\n", name)
-			for _, a := range m.annotations {
-				fmt.Printf("      annot = %v\n", a)
-			}
-		}
-	}
-}
-
 func parseComments(comments *ast.CommentGroup) []annotation {
 	const (
 		tag = "synt:"
 	)
 	var result []annotation
-	if comments == nil {
+	if comments == nil || len(comments.Text()) == 0 {
 		return result
 	}
 	for _, comment := range comments.List {
@@ -143,9 +122,9 @@ func parseComments(comments *ast.CommentGroup) []annotation {
 
 func parseRecord(rec string) (annotation, error) {
 	var result annotation
-	elems := strings.Split(strings.TrimSpace(rec), ":")
+	elems := strings.Split(strings.TrimSpace(rec), ".")
 	l := len(elems)
-	if l < 2 || l > 3 {
+	if l < 2 {
 		return result, errors.Errorf("invalid directive: %v", rec)
 	}
 	lockType := elems[l-1]
@@ -156,9 +135,28 @@ func parseRecord(rec string) (annotation, error) {
 	} else {
 		return result, errors.Errorf("invalid lock type: %s", lockType)
 	}
-	result.mutex = elems[l-2]
-	if l == 3 {
-		result.object = elems[0]
+	if strings.HasPrefix(elems[0], "!") {
+		result.not = true
+		elems[0] = strings.TrimLeft(elems[0], "!")
 	}
+	result.obj = idFromParts(elems[:len(elems)-1]...)
 	return result, nil
+}
+
+func debugPrintPkgDesc(desc *pkgDesc) {
+	for name, td := range desc.types {
+		fmt.Printf("type %s\n", name)
+		for name, f := range td.fields {
+			fmt.Printf("    field %s\n", name)
+			for _, a := range f.annotations {
+				fmt.Printf("      annot = %v\n", a)
+			}
+		}
+		for name, m := range td.methods {
+			fmt.Printf("    method %s\n", name)
+			for _, a := range m.annotations {
+				fmt.Printf("      annot = %v\n", a)
+			}
+		}
+	}
 }

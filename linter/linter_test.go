@@ -25,15 +25,20 @@ func TestLinterParseComments(t *testing.T) {
 		types: map[string]*typeDesc{
 			"Type1": &typeDesc{
 				methods: map[string]methodDesc{
-					"func1": methodDesc{},
+					"func1": methodDesc{
+						annotations: []annotation{
+							annotation{obj: idFromParts("t", "m"), lock: lockTypeL, not: true},
+						},
+					},
 					"func2": methodDesc{
 						annotations: []annotation{
-							annotation{"", "@m", lockTypeL},
+							annotation{obj: idFromParts("t", "m"), lock: lockTypeL},
 						},
 					},
 					"func3": methodDesc{
 						annotations: []annotation{
-							annotation{"", "@m", lockTypeL},
+							annotation{obj: idFromParts("t", "m"), lock: lockTypeR},
+							annotation{obj: idFromParts("t", "mut"), lock: lockTypeL},
 						},
 					},
 					"func4": methodDesc{},
@@ -86,6 +91,7 @@ func TestFuncVisitor(t *testing.T) {
 		return
 	}
 	ast.Walk(&printVisitor{}, func5Desc.node)
+	ast.Walk(&funcVisitor{sc: &syntChecker{}}, func5Desc.node)
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {
@@ -118,11 +124,8 @@ func compareAnnotations(expected, actual annotation) error {
 	if expected.lock != actual.lock {
 		return errors.Errorf("expected lock %d, got %d", expected.lock, actual.lock)
 	}
-	if expected.mutex != actual.mutex {
-		return errors.Errorf("expected mutex %q, got %q", expected.mutex, actual.mutex)
-	}
-	if expected.object != actual.object {
-		return errors.Errorf("expected object %q, got %q", expected.object, actual.object)
+	if !expected.obj.eq(actual.obj) {
+		return errors.Errorf("expected obj %q, got %q", expected.obj.String(), actual.obj.String())
 	}
 	return nil
 }
