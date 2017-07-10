@@ -6,6 +6,8 @@ import (
 	"go/ast"
 	"reflect"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -15,6 +17,11 @@ const (
 	mutStateMayL
 	mutStateMayR
 	mutStateMayLR
+
+	musActLock = iota
+	mutActRLock
+	mutActUnlock
+	mutActRUnlock
 )
 
 const (
@@ -23,20 +30,79 @@ const (
 	exprExec
 )
 
-type state struct {
+var stateTable = [][]stateChange{
+	[]stateChange{ // old state is Unlocked
+		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
+		stateChange{new: mutStateL, err: nil},
+		stateChange{new: mutStateR, err: nil},
+		stateChange{new: mutStateMayL, err: nil},
+		stateChange{new: mutStateMayR, err: nil},
+		stateChange{new: mutStateMayLR, err: nil},
+	},
+	[]stateChange{ // old state is Locked
+		stateChange{new: mutStateUnlocked, err: nil},
+		stateChange{new: mutStateL, err: errors.New("lock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("rlock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible rlock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+	},
+	[]stateChange{ // old state is Rlocked
+		stateChange{new: mutStateUnlocked, err: nil},
+		stateChange{new: mutStateL, err: errors.New("lock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("rlock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible rlock of locked mutex")},
+		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+	},
+}
+
+type stateChange struct {
+	new int
+	err error
+}
+
+type syntState struct {
 	mut map[string]int
 }
 
+func (ss *syntState) stateChange(name string, state int) error {
+	old, found := ss.mut[name]
+	if !found {
+		ss.mut[name] = state
+		return nil
+	}
+
+}
+
 type syntChecker struct {
-	f   *methodDesc
-	pkg *pkgDesc
-	st  *state
+	pkg     *pkgDesc
+	typ     string
+	fun     string
+	st      *syntState
+	reports []Report
+}
+
+func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
+	return &syntChecker{
+		pkg: pkg,
+		typ: typ,
+		fun: fun,
+		st:  &syntState{mut: make(map[string]int)},
+	}
 }
 
 func (sc *syntChecker) onExpr(op int, obj id) {
 	println("exec ", obj.String())
 	switch op {
 	case exprExec:
+		sc.onExec(obj)
+	}
+}
+
+func (sc *syntChecker) onExec(obj id) {
+	switch obj.name().String() {
+	case "Lock":
 
 	}
 }
@@ -53,7 +119,7 @@ func idFromParts(parts ...string) id {
 	return id{parts: parts}
 }
 
-func (i *id) String() string {
+func (i id) String() string {
 	return strings.Join(i.parts, ".")
 }
 
@@ -69,8 +135,12 @@ func (i *id) eq(other id) bool {
 	return true
 }
 
-func (i *id) last() string {
-	return i.parts[len(i.parts)-1]
+func (i *id) name() id {
+	return id{parts: []string{i.parts[len(i.parts)-1]}}
+}
+
+func (i *id) selector() id {
+	return id{parts: i.parts[:len(i.parts)-1]}
 }
 
 type funcVisitor struct {
