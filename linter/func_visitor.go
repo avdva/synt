@@ -126,12 +126,12 @@ func (sc *syntChecker) onExec(obj id) {
 	switch obj.name().String() {
 	case "Lock":
 		sc.st.stateChange(sel.String(), mutActLock)
-		if !md.canLock(sel, lockTypeL) {
+		if !md.canLock(sel) {
 
 		}
 	case "RLock":
 		sc.st.stateChange(sel.String(), mutActRLock)
-		if !md.canLock(sel, lockTypeR) {
+		if !md.canLock(sel) {
 
 		}
 	case "Unlock":
