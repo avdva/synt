@@ -18,7 +18,7 @@ const (
 	mutStateMayR
 	mutStateMayLR
 
-	musActLock = iota
+	mutActLock = iota
 	mutActRLock
 	mutActUnlock
 	mutActRUnlock
@@ -30,30 +30,43 @@ const (
 	exprExec
 )
 
+// stateTable shows how mutex state change in response to mutex actions.
 var stateTable = [][]stateChange{
 	[]stateChange{ // old state is Unlocked
-		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
 		stateChange{new: mutStateL, err: nil},
 		stateChange{new: mutStateR, err: nil},
-		stateChange{new: mutStateMayL, err: nil},
-		stateChange{new: mutStateMayR, err: nil},
-		stateChange{new: mutStateMayLR, err: nil},
+		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
+		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
 	},
 	[]stateChange{ // old state is Locked
-		stateChange{new: mutStateUnlocked, err: nil},
 		stateChange{new: mutStateL, err: errors.New("lock of locked mutex")},
 		stateChange{new: mutStateL, err: errors.New("rlock of locked mutex")},
-		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
-		stateChange{new: mutStateL, err: errors.New("possible rlock of locked mutex")},
-		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+		stateChange{new: mutStateUnlocked, err: nil},
+		stateChange{new: mutStateL, err: errors.New("runlock of locked mutex")},
 	},
 	[]stateChange{ // old state is Rlocked
+		stateChange{new: mutStateL, err: errors.New("lock of rlocked mutex")},
+		stateChange{new: mutStateR, err: errors.New("rlock of rlocked mutex")},
+		stateChange{new: mutStateUnlocked, err: errors.New("unlock of rlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: nil},
-		stateChange{new: mutStateL, err: errors.New("lock of locked mutex")},
-		stateChange{new: mutStateL, err: errors.New("rlock of locked mutex")},
+	},
+	[]stateChange{ // old state is may be Locked
 		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
-		stateChange{new: mutStateL, err: errors.New("possible rlock of locked mutex")},
+		stateChange{new: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
+		stateChange{new: mutStateUnlocked, err: nil},
+		stateChange{new: mutStateUnlocked, err: errors.New("possible runlock of locked mutex")},
+	},
+	[]stateChange{ // old state is may be RLocked
+		stateChange{new: mutStateL, err: errors.New("possible lock of rlocked mutex")},
+		stateChange{new: mutStateMayR, err: errors.New("possible rlock of rlocked mutex")},
+		stateChange{new: mutStateUnlocked, err: errors.New("possible unlock of rlocked mutex")},
+		stateChange{new: mutStateUnlocked, err: nil},
+	},
+	[]stateChange{ // old state is may be RLocked and Locked
 		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
+		stateChange{new: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
+		stateChange{new: mutStateUnlocked, err: errors.New("possible unlock of locked mutex")},
+		stateChange{new: mutStateMayL, err: errors.New("possible runlock of locked mutex")},
 	},
 }
 
@@ -66,13 +79,11 @@ type syntState struct {
 	mut map[string]int
 }
 
-func (ss *syntState) stateChange(name string, state int) error {
-	old, found := ss.mut[name]
-	if !found {
-		ss.mut[name] = state
-		return nil
-	}
-
+func (ss *syntState) stateChange(name string, act int) error {
+	old := ss.mut[name]
+	new := stateTable[old][act]
+	ss.mut[name] = new.new
+	return new.err
 }
 
 type syntChecker struct {
@@ -100,10 +111,33 @@ func (sc *syntChecker) onExpr(op int, obj id) {
 	}
 }
 
+func (sc *syntChecker) md() *methodDesc {
+	if typDesc, found := sc.pkg.types[sc.typ]; found {
+		if md, found := typDesc.methods[sc.fun]; found {
+			return &md
+		}
+	}
+	return nil
+}
+
 func (sc *syntChecker) onExec(obj id) {
+	sel := obj.selector()
+	md := sc.md()
 	switch obj.name().String() {
 	case "Lock":
+		sc.st.stateChange(sel.String(), mutActLock)
+		if !md.canLock(sel, lockTypeL) {
 
+		}
+	case "RLock":
+		sc.st.stateChange(sel.String(), mutActRLock)
+		if !md.canLock(sel, lockTypeR) {
+
+		}
+	case "Unlock":
+		sc.st.stateChange(sel.String(), mutActUnlock)
+	case "RUnlock":
+		sc.st.stateChange(sel.String(), mutActLock)
 	}
 }
 

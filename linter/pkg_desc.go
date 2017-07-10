@@ -27,6 +27,15 @@ type methodDesc struct {
 	annotations []annotation
 }
 
+func (md *methodDesc) canLock(obj id) bool {
+	for _, a := range md.annotations {
+		if a.obj.eq(obj) && !a.not {
+			return false
+		}
+	}
+	return true
+}
+
 type fieldDesc struct {
 	node        ast.Node
 	annotations []annotation
