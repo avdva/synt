@@ -4,6 +4,7 @@ package linter
 
 import (
 	"go/ast"
+	"go/token"
 	"reflect"
 	"strings"
 
@@ -17,7 +18,9 @@ const (
 	mutStateMayL
 	mutStateMayR
 	mutStateMayLR
+)
 
+const (
 	mutActLock = iota
 	mutActRLock
 	mutActUnlock
@@ -32,37 +35,37 @@ const (
 
 // stateTable shows how mutex state change in response to mutex actions.
 var stateTable = [][]stateChange{
-	[]stateChange{ // old state is Unlocked
+	[]stateChange{ // state is Unlocked
 		stateChange{new: mutStateL, err: nil},
 		stateChange{new: mutStateR, err: nil},
 		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
 	},
-	[]stateChange{ // old state is Locked
+	[]stateChange{ // state is Locked
 		stateChange{new: mutStateL, err: errors.New("lock of locked mutex")},
 		stateChange{new: mutStateL, err: errors.New("rlock of locked mutex")},
 		stateChange{new: mutStateUnlocked, err: nil},
 		stateChange{new: mutStateL, err: errors.New("runlock of locked mutex")},
 	},
-	[]stateChange{ // old state is Rlocked
+	[]stateChange{ // state is Rlocked
 		stateChange{new: mutStateL, err: errors.New("lock of rlocked mutex")},
 		stateChange{new: mutStateR, err: errors.New("rlock of rlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: errors.New("unlock of rlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: nil},
 	},
-	[]stateChange{ // old state is may be Locked
+	[]stateChange{ // state is may be Locked
 		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
 		stateChange{new: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
 		stateChange{new: mutStateUnlocked, err: nil},
 		stateChange{new: mutStateUnlocked, err: errors.New("possible runlock of locked mutex")},
 	},
-	[]stateChange{ // old state is may be RLocked
+	[]stateChange{ // state is may be RLocked
 		stateChange{new: mutStateL, err: errors.New("possible lock of rlocked mutex")},
 		stateChange{new: mutStateMayR, err: errors.New("possible rlock of rlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: errors.New("possible unlock of rlocked mutex")},
 		stateChange{new: mutStateUnlocked, err: nil},
 	},
-	[]stateChange{ // old state is may be RLocked and Locked
+	[]stateChange{ // state is may be RLocked and Locked
 		stateChange{new: mutStateL, err: errors.New("possible lock of locked mutex")},
 		stateChange{new: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
 		stateChange{new: mutStateUnlocked, err: errors.New("possible unlock of locked mutex")},
@@ -87,62 +90,81 @@ func (ss *syntState) stateChange(name string, act int) error {
 }
 
 type syntChecker struct {
-	pkg     *pkgDesc
-	typ     string
-	fun     string
-	st      *syntState
-	reports []Report
+	pkg       *pkgDesc
+	typ       string
+	fun       string
+	st        *syntState
+	currentMD *methodDesc
+	reports   []Report
 }
 
 func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
-	return &syntChecker{
+	result := &syntChecker{
 		pkg: pkg,
 		typ: typ,
 		fun: fun,
 		st:  &syntState{mut: make(map[string]int)},
 	}
+	if len(result.typ) > 0 {
+		if typDesc, found := result.pkg.types[result.typ]; found {
+			if md, found := typDesc.methods[result.fun]; found {
+				result.currentMD = &md
+			}
+		}
+	} else {
+		/*if md, found := result.pkg. [result.fun]; found {
+			result =  &md
+		}*/
+	}
+	if result.currentMD == nil {
+		panic("unknown context")
+	}
+	return result
 }
 
-func (sc *syntChecker) onExpr(op int, obj id) {
+func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
 	println("exec ", obj.String())
 	switch op {
 	case exprExec:
-		sc.onExec(obj)
-	}
-}
-
-func (sc *syntChecker) md() *methodDesc {
-	if typDesc, found := sc.pkg.types[sc.typ]; found {
-		if md, found := typDesc.methods[sc.fun]; found {
-			return &md
+		errors := sc.onExec(obj)
+		for _, e := range errors {
+			sc.reports = append(sc.reports, Report{pos: pos, text: e.Error()})
 		}
 	}
-	return nil
 }
 
-func (sc *syntChecker) onExec(obj id) {
+func (sc *syntChecker) onExec(obj id) []error {
+	var result []error
 	sel := obj.selector()
-	md := sc.md()
 	switch obj.name().String() {
 	case "Lock":
-		sc.st.stateChange(sel.String(), mutActLock)
-		if !md.canLock(sel) {
-
+		if !sc.currentMD.canLock(sel) {
+			result = append(result, errors.Errorf("%s cannot lock %s due to an annotation."))
+		}
+		if err := sc.st.stateChange(sel.String(), mutActLock); err != nil {
+			result = append(result, err)
 		}
 	case "RLock":
-		sc.st.stateChange(sel.String(), mutActRLock)
-		if !md.canLock(sel) {
-
+		if !sc.currentMD.canLock(sel) {
+			result = append(result, errors.Errorf("%s cannot rlock %s due to an annotation."))
+		}
+		if err := sc.st.stateChange(sel.String(), mutActRLock); err != nil {
+			result = append(result, err)
 		}
 	case "Unlock":
-		sc.st.stateChange(sel.String(), mutActUnlock)
+		if err := sc.st.stateChange(sel.String(), mutActUnlock); err != nil {
+			result = append(result, err)
+		}
 	case "RUnlock":
-		sc.st.stateChange(sel.String(), mutActLock)
+		if err := sc.st.stateChange(sel.String(), mutActRUnlock); err != nil {
+			result = append(result, err)
+		}
 	}
+	return result
 }
 
 type stateChanger interface {
-	onExpr(op int, obj id)
+	onExpr(op int, obj id, pos token.Pos)
 }
 
 type id struct {
@@ -216,7 +238,7 @@ func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(sm, arg)
 		}
 		if expanded := expandSel(typed.Fun); expanded != nil {
-			sm.sc.onExpr(exprExec, idFromParts(expanded...))
+			sm.sc.onExpr(exprExec, idFromParts(expanded...), typed.Pos())
 		}
 	case *ast.AssignStmt:
 	case *ast.IncDecStmt:

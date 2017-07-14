@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-// synt:t.m.R, t.mut.L
+// synt:t.m.RLock, t.mut.Lock
 func (t *Type1) func3() int {
 	t.m.Lock()
 	return 3

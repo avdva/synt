@@ -6,23 +6,16 @@ import (
 	"fmt"
 	"go/ast"
 	"strings"
-
-	"github.com/pkg/errors"
-)
-
-const (
-	lockTypeL = iota
-	lockTypeR
 )
 
 type annotation struct {
-	obj  id
-	lock int
-	not  bool
+	obj id
+	not bool
 }
 
 type methodDesc struct {
 	node        ast.Node
+	name        string
 	recvName    string
 	annotations []annotation
 }
@@ -69,6 +62,7 @@ func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
 	td := d.descForType(typName)
 	td.methods[node.Name.Name] = methodDesc{
 		node:        node,
+		name:        node.Name.Name,
 		recvName:    recv.Names[0].Name,
 		annotations: annotations,
 	}
@@ -121,35 +115,21 @@ func parseComments(comments *ast.CommentGroup) []annotation {
 		text = text[len(tag):]
 		parts := strings.Split(text, ",")
 		for _, part := range parts {
-			if rec, err := parseRecord(part); err == nil {
-				result = append(result, rec)
-			}
+			result = append(result, parseRecord(part))
 		}
 	}
 	return result
 }
 
-func parseRecord(rec string) (annotation, error) {
+func parseRecord(rec string) annotation {
 	var result annotation
-	elems := strings.Split(strings.TrimSpace(rec), ".")
-	l := len(elems)
-	if l < 2 {
-		return result, errors.Errorf("invalid directive: %v", rec)
-	}
-	lockType := elems[l-1]
-	if lockType == "L" {
-		result.lock = lockTypeL
-	} else if lockType == "R" {
-		result.lock = lockTypeR
-	} else {
-		return result, errors.Errorf("invalid lock type: %s", lockType)
-	}
-	if strings.HasPrefix(elems[0], "!") {
+	rec = strings.TrimSpace(rec)
+	if strings.HasPrefix(rec, "!") {
 		result.not = true
-		elems[0] = strings.TrimLeft(elems[0], "!")
+		rec = strings.TrimLeft(rec, "!")
 	}
-	result.obj = idFromParts(elems[:len(elems)-1]...)
-	return result, nil
+	result.obj = idFromParts(strings.Split(rec, ".")...)
+	return result
 }
 
 func debugPrintPkgDesc(desc *pkgDesc) {

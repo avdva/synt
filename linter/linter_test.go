@@ -3,6 +3,7 @@
 package linter
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -27,22 +28,23 @@ func TestLinterParseComments(t *testing.T) {
 				methods: map[string]methodDesc{
 					"func1": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m"), lock: lockTypeL, not: true},
+							annotation{obj: idFromParts("t", "m", "Lock"), not: true},
 						},
 					},
 					"func2": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m"), lock: lockTypeL},
+							annotation{obj: idFromParts("t", "m", "Lock")},
 						},
 					},
 					"func3": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m"), lock: lockTypeR},
-							annotation{obj: idFromParts("t", "mut"), lock: lockTypeL},
+							annotation{obj: idFromParts("t", "m", "RLock")},
+							annotation{obj: idFromParts("t", "mut", "Lock")},
 						},
 					},
 					"func4": methodDesc{},
 					"func5": methodDesc{},
+					"getM":  methodDesc{},
 				},
 			},
 			"Type2": &typeDesc{
@@ -91,7 +93,11 @@ func TestFuncVisitor(t *testing.T) {
 		return
 	}
 	ast.Walk(&printVisitor{}, func5Desc.node)
-	ast.Walk(&funcVisitor{sc: &syntChecker{}}, func5Desc.node)
+	sc := newSyntChecker(desc, "Type1", "func3")
+	ast.Walk(&funcVisitor{sc: sc}, func5Desc.node)
+	for _, rep := range sc.reports {
+		println(fmt.Sprintf("%s: %s", rep.text, fs.Position(rep.pos)))
+	}
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {
@@ -121,9 +127,6 @@ func compareMethodDesc(expected, actual *methodDesc) error {
 }
 
 func compareAnnotations(expected, actual annotation) error {
-	if expected.lock != actual.lock {
-		return errors.Errorf("expected lock %d, got %d", expected.lock, actual.lock)
-	}
 	if !expected.obj.eq(actual.obj) {
 		return errors.Errorf("expected obj %q, got %q", expected.obj.String(), actual.obj.String())
 	}
