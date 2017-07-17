@@ -94,9 +94,9 @@ func TestFuncVisitor(t *testing.T) {
 	}
 	ast.Walk(&printVisitor{}, func5Desc.node)
 	sc := newSyntChecker(desc, "Type1", "func3")
-	ast.Walk(&funcVisitor{sc: sc}, func5Desc.node)
+	sc.check()
 	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.text, fs.Position(rep.pos)))
+		println(fmt.Sprintf("%s: %s", rep.text, fs.Position(rep.pos).String()))
 	}
 }
 

@@ -122,6 +122,10 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	return result
 }
 
+func (sc *syntChecker) check() {
+	ast.Walk(&funcVisitor{sc: sc}, sc.currentMD.node)
+}
+
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
 	println("exec ", obj.String())
 	switch op {
@@ -138,15 +142,16 @@ func (sc *syntChecker) onExec(obj id) []error {
 	sel := obj.selector()
 	switch obj.name().String() {
 	case "Lock":
-		if !sc.currentMD.canLock(sel) {
-			result = append(result, errors.Errorf("%s cannot lock %s due to an annotation."))
+		println("        ", obj.String())
+		if !sc.currentMD.canCall(obj) {
+			result = append(result, errors.Errorf("%s cannot lock %s due to an annotation.", sc.currentMD.name, sel.String()))
 		}
 		if err := sc.st.stateChange(sel.String(), mutActLock); err != nil {
 			result = append(result, err)
 		}
 	case "RLock":
-		if !sc.currentMD.canLock(sel) {
-			result = append(result, errors.Errorf("%s cannot rlock %s due to an annotation."))
+		if !sc.currentMD.canCall(obj) {
+			result = append(result, errors.Errorf("%s cannot rlock %s due to an annotation.", sc.currentMD.name, sel.String()))
 		}
 		if err := sc.st.stateChange(sel.String(), mutActRLock); err != nil {
 			result = append(result, err)
@@ -179,7 +184,7 @@ func (i id) String() string {
 	return strings.Join(i.parts, ".")
 }
 
-func (i *id) eq(other id) bool {
+func (i id) eq(other id) bool {
 	if len(i.parts) != len(other.parts) {
 		return false
 	}
@@ -195,7 +200,7 @@ func (i *id) name() id {
 	return id{parts: []string{i.parts[len(i.parts)-1]}}
 }
 
-func (i *id) selector() id {
+func (i id) selector() id {
 	return id{parts: i.parts[:len(i.parts)-1]}
 }
 

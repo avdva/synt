@@ -20,9 +20,9 @@ type methodDesc struct {
 	annotations []annotation
 }
 
-func (md *methodDesc) canLock(obj id) bool {
+func (md *methodDesc) canCall(obj id) bool {
 	for _, a := range md.annotations {
-		if a.obj.eq(obj) && !a.not {
+		if a.obj.selector().eq(obj.selector()) && !a.not {
 			return false
 		}
 	}
