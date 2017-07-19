@@ -8,6 +8,38 @@ import (
 	"strings"
 )
 
+type id struct {
+	parts []string
+}
+
+func idFromParts(parts ...string) id {
+	return id{parts: parts}
+}
+
+func (i id) String() string {
+	return strings.Join(i.parts, ".")
+}
+
+func (i id) eq(other id) bool {
+	if len(i.parts) != len(other.parts) {
+		return false
+	}
+	for i, p := range i.parts {
+		if p != other.parts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (i *id) name() id {
+	return id{parts: []string{i.parts[len(i.parts)-1]}}
+}
+
+func (i id) selector() id {
+	return id{parts: i.parts[:len(i.parts)-1]}
+}
+
 type annotation struct {
 	obj id
 	not bool
@@ -15,18 +47,8 @@ type annotation struct {
 
 type methodDesc struct {
 	node        ast.Node
-	name        string
-	recvName    string
+	obj         id
 	annotations []annotation
-}
-
-func (md *methodDesc) canCall(obj id) bool {
-	for _, a := range md.annotations {
-		if a.obj.selector().eq(obj.selector()) && !a.not {
-			return false
-		}
-	}
-	return true
 }
 
 type fieldDesc struct {
@@ -62,8 +84,7 @@ func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
 	td := d.descForType(typName)
 	td.methods[node.Name.Name] = methodDesc{
 		node:        node,
-		name:        node.Name.Name,
-		recvName:    recv.Names[0].Name,
+		obj:         idFromParts(recv.Names[0].Name, node.Name.Name),
 		annotations: annotations,
 	}
 }

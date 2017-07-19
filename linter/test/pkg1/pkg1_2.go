@@ -10,6 +10,11 @@ func (t *Type1) func3() int {
 	return 3
 }
 
+func (t *Type1) func3_1(arg int) {
+	t.func3()
+	return
+}
+
 func (t *Type1) func4(arg int) int {
 	t.func2()
 	return 4

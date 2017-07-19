@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -42,9 +43,10 @@ func TestLinterParseComments(t *testing.T) {
 							annotation{obj: idFromParts("t", "mut", "Lock")},
 						},
 					},
-					"func4": methodDesc{},
-					"func5": methodDesc{},
-					"getM":  methodDesc{},
+					"func3_1": methodDesc{},
+					"func4":   methodDesc{},
+					"func5":   methodDesc{},
+					"getM":    methodDesc{},
 				},
 			},
 			"Type2": &typeDesc{
@@ -92,7 +94,7 @@ func TestFuncVisitor(t *testing.T) {
 	if !a.True(found) {
 		return
 	}
-	ast.Walk(&printVisitor{}, func5Desc.node)
+	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc := newSyntChecker(desc, "Type1", "func3")
 	sc.check()
 	for _, rep := range sc.reports {
