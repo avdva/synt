@@ -25,12 +25,6 @@ const (
 	mutActRUnlock
 )
 
-const (
-	exprRead = iota
-	exprWrite
-	exprExec
-)
-
 // stateTable shows how mutex state change in response to mutex actions.
 var stateTable = [][]stateChange{
 	[]stateChange{ // state is Unlocked
@@ -71,13 +65,33 @@ var stateTable = [][]stateChange{
 	},
 }
 
+type mutexState int
+
+func (m mutexState) String() string {
+	switch m {
+	case mutStateUnlocked:
+		return "unlocked"
+	case mutStateL:
+		return "locked"
+	case mutStateR:
+		return "rlocked"
+	case mutStateMayL:
+		return "?locked"
+	case mutStateMayR:
+		return "?rlocked"
+	case mutStateMayLR:
+		return "?rwlocked"
+	}
+	return "unknown"
+}
+
 type stateChange struct {
-	state int
+	state mutexState
 	err   error
 }
 
 type syntState struct {
-	mut map[string]int
+	mut map[string]mutexState
 }
 
 func (ss *syntState) stateChange(name string, act int) error {
@@ -85,6 +99,17 @@ func (ss *syntState) stateChange(name string, act int) error {
 	change := stateTable[old][act]
 	ss.mut[name] = change.state
 	return change.err
+}
+
+func (ss *syntState) ensureState(name string, state mutexState) error {
+	curState := ss.mut[name]
+	if curState == state {
+		return nil
+	}
+	if state == mutStateR && curState == mutStateL {
+		return nil
+	}
+	return errors.Errorf("mutex %s is in state %s, but should be in state %s", name, curState, state)
 }
 
 type syntChecker struct {
@@ -101,7 +126,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		pkg: pkg,
 		typ: typ,
 		fun: fun,
-		st:  &syntState{mut: make(map[string]int)},
+		st:  &syntState{mut: make(map[string]mutexState)},
 	}
 	if len(result.typ) > 0 {
 		if typDesc, found := result.pkg.types[result.typ]; found {
@@ -168,7 +193,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 
 func (sc *syntChecker) checkExec(obj id) []error {
 	sel := obj.selector()
-	if !sel.eq(sc.currentMD.obj.name()) {
+	if !sel.eq(sc.currentMD.obj.selector()) {
 		return nil
 	}
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
@@ -178,19 +203,48 @@ func (sc *syntChecker) checkExec(obj id) []error {
 	if !found {
 		return []error{errors.Errorf("unknown method %s", obj.name())}
 	}
+	var result []error
 	for _, a := range callee.annotations {
-		switch a.obj.name() {
+		var state mutexState
+		switch a.obj.name().String() {
 		case "Lock":
-
+			state = mutStateL
+		case "RLock":
+			state = mutStateR
+		default:
+			continue
+		}
+		if gotLock, err := sc.checkCallerAnnotation(a); err != nil {
+			result = append(result, err)
+		} else if !gotLock {
+			if err = sc.st.ensureState(a.obj.selector().String(), state); err != nil {
+				result = append(result, err)
+			}
 		}
 	}
-	return nil
+	return result
 }
 
-func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) error {
-	for _, aCaller := range sc.currentMD.annotations {
-
+func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err error) {
+	caleeName := aCalee.obj.name().String()
+	if caleeName != "Lock" && caleeName != "RLock" {
+		return
 	}
+	for _, aCaller := range sc.currentMD.annotations {
+		callerName := aCaller.obj.name().String()
+		if callerName != "Lock" && callerName != "RLock" {
+			continue
+		}
+		if aCalee.obj.selector().eq(aCaller.obj.selector()) {
+			if caleeName == "Lock" && callerName == "RLock" {
+				err = errors.New("caller's lock annotation doesn't imply callee's one")
+			} else {
+				gotLock = true
+			}
+			break
+		}
+	}
+	return
 }
 
 func (sc *syntChecker) canLock(obj id) bool {

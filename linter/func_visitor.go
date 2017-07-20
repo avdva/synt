@@ -7,6 +7,12 @@ import (
 	"go/token"
 )
 
+const (
+	exprRead = iota
+	exprWrite
+	exprExec
+)
+
 type stateChanger interface {
 	onExpr(op int, obj id, pos token.Pos)
 }
