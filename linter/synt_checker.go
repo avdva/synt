@@ -179,9 +179,18 @@ func (sc *syntChecker) checkExec(obj id) []error {
 		return []error{errors.Errorf("unknown method %s", obj.name())}
 	}
 	for _, a := range callee.annotations {
-		_ = a
+		switch a.obj.name() {
+		case "Lock":
+
+		}
 	}
 	return nil
+}
+
+func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) error {
+	for _, aCaller := range sc.currentMD.annotations {
+
+	}
 }
 
 func (sc *syntChecker) canLock(obj id) bool {
