@@ -16,13 +16,11 @@ import (
 
 func TestLinterParseComments(t *testing.T) {
 	a := assert.New(t)
-	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, "./test/pkg1", nil, parser.ParseComments)
+	l, err := makeLinter("./test/pkg1", "pkg1")
 	if !a.NoError(err) {
 		return
 	}
-	l := New(fs, pkgs["pkg1"])
-	actual := l.makePkgDesc()
+	actual := makePkgDesc(l.pkg)
 	expected := &pkgDesc{
 		types: map[string]*typeDesc{
 			"Type1": &typeDesc{
@@ -63,6 +61,83 @@ func TestLinterParseComments(t *testing.T) {
 	a.NoError(comparePkgDesc(expected, actual))
 }
 
+func TestFunc5(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l, "Type1", "func5")
+	if !a.NoError(err) {
+		return
+	}
+	func5Desc := sc.pkg.types["Type1"].methods["func5"]
+	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
+	sc.check()
+	for _, rep := range sc.reports {
+		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l, "Type1", "func3")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	for _, rep := range sc.reports {
+		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3_1(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l, "Type1", "func3_1")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	for _, rep := range sc.reports {
+		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func makeLinter(path, pkg string) (*Linter, error) {
+	fs := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fs, path, nil, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	pkgAst, found := pkgs[pkg]
+	if !found {
+		return nil, errors.Errorf("package %s not found", pkg)
+	}
+	return New(fs, pkgAst), nil
+}
+
+func makeSyntChecker(l *Linter, typ, fun string) (*syntChecker, error) {
+	desc := makePkgDesc(l.pkg)
+	typeDesc, found := desc.types[typ]
+	if !found {
+		return nil, errors.Errorf("type %s not found", typ)
+	}
+	_, found = typeDesc.methods[fun]
+	if !found {
+		return nil, errors.Errorf("func %s not found", fun)
+	}
+	sc := newSyntChecker(desc, typ, fun)
+	return sc, nil
+}
+
 func comparePkgDesc(expected, actual *pkgDesc) error {
 	if len(expected.types) != len(actual.types) {
 		return errors.Errorf("types count mismatch, expected %d, got %d", len(expected.types), len(actual.types))
@@ -75,31 +150,6 @@ func comparePkgDesc(expected, actual *pkgDesc) error {
 		}
 	}
 	return nil
-}
-
-func TestFuncVisitor(t *testing.T) {
-	a := assert.New(t)
-	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, "./test/pkg1", nil, parser.ParseComments)
-	if !a.NoError(err) {
-		return
-	}
-	l := New(fs, pkgs["pkg1"])
-	desc := l.makePkgDesc()
-	type1Desc, found := desc.types["Type1"]
-	if !a.True(found) {
-		return
-	}
-	func5Desc, found := type1Desc.methods["func5"]
-	if !a.True(found) {
-		return
-	}
-	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
-	sc := newSyntChecker(desc, "Type1", "func3_1")
-	sc.check()
-	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.text, fs.Position(rep.pos).String()))
-	}
 }
 
 func compareTypeDesc(expected, actual *typeDesc) error {

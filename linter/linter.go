@@ -22,9 +22,15 @@ func New(fs *token.FileSet, pkg *ast.Package) *Linter {
 	return &Linter{fs: fs, pkg: pkg}
 }
 
-func (l *Linter) makePkgDesc() *pkgDesc {
+func (l *Linter) Do() []Report {
+	desc := makePkgDesc(l.pkg)
+	_ = desc
+	return nil
+}
+
+func makePkgDesc(pkg *ast.Package) *pkgDesc {
 	var allFiles []string
-	for name := range l.pkg.Files {
+	for name := range pkg.Files {
 		allFiles = append(allFiles, name)
 	}
 	sort.Strings(allFiles)
@@ -34,15 +40,8 @@ func (l *Linter) makePkgDesc() *pkgDesc {
 	}
 	fv := &fileVisitor{desc}
 	for _, name := range allFiles {
-		file := l.pkg.Files[name]
+		file := pkg.Files[name]
 		ast.Walk(fv, file)
 	}
 	return desc
-}
-
-func (l *Linter) Do() []Report {
-	desc := l.makePkgDesc()
-	_ = desc
-	//debugPrintPkgDesc(desc)
-	return nil
 }
