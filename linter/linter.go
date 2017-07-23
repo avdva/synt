@@ -14,8 +14,8 @@ type Linter struct {
 }
 
 type Report struct {
-	pos  token.Pos
-	text string
+	pos token.Pos
+	err error
 }
 
 func New(fs *token.FileSet, pkg *ast.Package) *Linter {

@@ -3,6 +3,7 @@
 package linter
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 
@@ -85,6 +86,45 @@ func (m mutexState) String() string {
 	return "unknown"
 }
 
+type mutexAct int
+
+func (m mutexAct) String() string {
+	switch m {
+	case mutActLock:
+		return "lock"
+	case mutActRLock:
+		return "rlock"
+	case mutActUnlock:
+		return "unlock"
+	case mutActRUnlock:
+		return "runlock"
+	}
+	return "unknown"
+}
+
+type invalidStateError struct {
+	name             string
+	expected, actual mutexState
+}
+
+func (e invalidStateError) Error() string {
+	return fmt.Sprintf("mutex %q is in state %s, but expected state is %s", e.name, e.actual, e.expected)
+}
+
+type invalidActError struct {
+	subject, object string
+	reason          string
+	action          mutexAct
+}
+
+func (e invalidActError) Error() string {
+	result := fmt.Sprintf("%s cannot %q %s", e.subject, e.action, e.object)
+	if len(e.reason) > 0 {
+		result = result + " [" + e.reason + "]"
+	}
+	return result
+}
+
 type stateChange struct {
 	state mutexState
 	err   error
@@ -94,7 +134,7 @@ type syntState struct {
 	mut map[string]mutexState
 }
 
-func (ss *syntState) stateChange(name string, act int) error {
+func (ss *syntState) stateChange(name string, act mutexAct) error {
 	old := ss.mut[name]
 	change := stateTable[old][act]
 	ss.mut[name] = change.state
@@ -109,7 +149,7 @@ func (ss *syntState) ensureState(name string, state mutexState) error {
 	if state == mutStateR && curState == mutStateL {
 		return nil
 	}
-	return errors.Errorf("mutex %s is in state %s, but should be in state %s", name, curState, state)
+	return invalidStateError{name: name, actual: curState, expected: state}
 }
 
 type syntChecker struct {
@@ -154,7 +194,7 @@ func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
 	case exprExec:
 		errors := sc.onExec(obj)
 		for _, e := range errors {
-			sc.reports = append(sc.reports, Report{pos: pos, text: e.Error()})
+			sc.reports = append(sc.reports, Report{pos: pos, err: e})
 		}
 	}
 }
@@ -165,14 +205,24 @@ func (sc *syntChecker) onExec(obj id) []error {
 	switch obj.name().String() {
 	case "Lock":
 		if !sc.canLock(obj) {
-			result = append(result, errors.Errorf("%s cannot lock %s due to an annotation", sc.currentMD.obj.name(), sel.String()))
+			result = append(result, invalidActError{
+				subject: sc.currentMD.obj.name().String(),
+				object:  sel.String(),
+				action:  mutActLock,
+				reason:  "annotation"},
+			)
 		}
 		if err := sc.st.stateChange(sel.String(), mutActLock); err != nil {
 			result = append(result, err)
 		}
 	case "RLock":
 		if !sc.canLock(obj) {
-			result = append(result, errors.Errorf("%s cannot rlock %s due to an annotation", sc.currentMD.obj.name(), sel.String()))
+			result = append(result, invalidActError{
+				subject: sc.currentMD.obj.name().String(),
+				object:  sel.String(),
+				action:  mutActRLock,
+				reason:  "annotation"},
+			)
 		}
 		if err := sc.st.stateChange(sel.String(), mutActRLock); err != nil {
 			result = append(result, err)
@@ -237,7 +287,7 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 		}
 		if aCalee.obj.selector().eq(aCaller.obj.selector()) {
 			if caleeName == "Lock" && callerName == "RLock" {
-				err = errors.New("caller's lock annotation doesn't imply callee's one")
+				err = invalidStateError{name: aCalee.obj.selector().String(), actual: mutStateR, expected: mutStateR}
 			} else {
 				gotLock = true
 			}

@@ -67,7 +67,7 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l, "Type1", "func5")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
 	if !a.NoError(err) {
 		return
 	}
@@ -75,7 +75,7 @@ func TestFunc5(t *testing.T) {
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
 	}
 }
 
@@ -85,13 +85,24 @@ func TestFunc3(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l, "Type1", "func3")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3")
 	if !a.NoError(err) {
 		return
 	}
 	sc.check()
-	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+	expected := []error{
+		invalidActError{
+			subject: "func3",
+			object:  "t.m",
+			action:  mutActLock,
+			reason:  "annotation",
+		},
+	}
+	for i, rep := range sc.reports {
+		if !a.Equal(expected[i], rep.err) {
+
+		}
+		println(fmt.Sprintf("%s: %s", l.fs.Position(rep.pos).String(), rep.err))
 	}
 }
 
@@ -101,13 +112,13 @@ func TestFunc3_1(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l, "Type1", "func3_1")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_1")
 	if !a.NoError(err) {
 		return
 	}
 	sc.check()
 	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.text, l.fs.Position(rep.pos).String()))
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
 	}
 }
 
@@ -124,8 +135,8 @@ func makeLinter(path, pkg string) (*Linter, error) {
 	return New(fs, pkgAst), nil
 }
 
-func makeSyntChecker(l *Linter, typ, fun string) (*syntChecker, error) {
-	desc := makePkgDesc(l.pkg)
+func makeSyntChecker(pkg *ast.Package, typ, fun string) (*syntChecker, error) {
+	desc := makePkgDesc(pkg)
 	typeDesc, found := desc.types[typ]
 	if !found {
 		return nil, errors.Errorf("type %s not found", typ)
@@ -183,4 +194,18 @@ func compareAnnotations(expected, actual annotation) error {
 		return errors.Errorf("expected obj %q, got %q", expected.obj.String(), actual.obj.String())
 	}
 	return nil
+}
+
+func compareErrors(a, b error) bool {
+	switch typed := a.(type) {
+	case invalidActError:
+		if ia, ok := b.(invalidActError); ok {
+			return typed == ia
+		}
+	case invalidStateError:
+		if is, ok := b.(invalidStateError); ok {
+			return typed == is
+		}
+	}
+	return a.Error() == b.Error()
 }
