@@ -96,4 +96,8 @@ func (t *Type1) func6() {
 	go func() {
 		t.func3()
 	}()
+	a := func() int {
+		return 0
+	}()
+	_ = a
 }
