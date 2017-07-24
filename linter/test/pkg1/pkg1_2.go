@@ -15,6 +15,31 @@ func (t *Type1) func3_1(arg int) {
 	return
 }
 
+// synt:t.m.Lock
+func (t *Type1) func3_2() {
+}
+
+func (t *Type1) func3_3() {
+	t.m.RLock()
+	t.func3_2()
+}
+
+// synt:t.m.RLock
+func (t *Type1) func3_4() {
+	t.func3_2()
+}
+
+func (t *Type1) func3_5() {
+	t.m.RUnlock()
+	t.m.Unlock()
+}
+
+func (t *Type1) func3_6() {
+	t.m.Lock()
+	t.m.Unlock()
+	t.m.Unlock()
+}
+
 func (t *Type1) func4(arg int) int {
 	t.func2()
 	return 4
@@ -65,4 +90,10 @@ func (t *Type1) func5() {
 	}
 	t.getM().RLock()
 	t.i++
+}
+
+func (t *Type1) func6() {
+	go func() {
+		t.func3()
+	}()
 }

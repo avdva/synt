@@ -31,38 +31,38 @@ var stateTable = [][]stateChange{
 	[]stateChange{ // state is Unlocked
 		stateChange{state: mutStateL, err: nil},
 		stateChange{state: mutStateR, err: nil},
-		stateChange{state: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
-		stateChange{state: mutStateUnlocked, err: errors.New("unlock of unlocked mutex")},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
 	},
 	[]stateChange{ // state is Locked
-		stateChange{state: mutStateL, err: errors.New("lock of locked mutex")},
-		stateChange{state: mutStateL, err: errors.New("rlock of locked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
 		stateChange{state: mutStateUnlocked, err: nil},
-		stateChange{state: mutStateL, err: errors.New("runlock of locked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "locked"}},
 	},
 	[]stateChange{ // state is Rlocked
-		stateChange{state: mutStateL, err: errors.New("lock of rlocked mutex")},
-		stateChange{state: mutStateR, err: errors.New("rlock of rlocked mutex")},
-		stateChange{state: mutStateUnlocked, err: errors.New("unlock of rlocked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
+		stateChange{state: mutStateR, err: &invalidActError{reason: "already rlocked"}},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "rlocked"}},
 		stateChange{state: mutStateUnlocked, err: nil},
 	},
 	[]stateChange{ // state is may be Locked
-		stateChange{state: mutStateL, err: errors.New("possible lock of locked mutex")},
-		stateChange{state: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
+		stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
 		stateChange{state: mutStateUnlocked, err: nil},
-		stateChange{state: mutStateUnlocked, err: errors.New("possible runlock of locked mutex")},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?locked"}},
 	},
 	[]stateChange{ // state is may be RLocked
-		stateChange{state: mutStateL, err: errors.New("possible lock of rlocked mutex")},
-		stateChange{state: mutStateMayR, err: errors.New("possible rlock of rlocked mutex")},
-		stateChange{state: mutStateUnlocked, err: errors.New("possible unlock of rlocked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
+		stateChange{state: mutStateMayR, err: &invalidActError{reason: "already rlocked"}},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
 		stateChange{state: mutStateUnlocked, err: nil},
 	},
 	[]stateChange{ // state is may be RLocked and Locked
-		stateChange{state: mutStateL, err: errors.New("possible lock of locked mutex")},
-		stateChange{state: mutStateMayLR, err: errors.New("possible rlock of locked mutex")},
-		stateChange{state: mutStateUnlocked, err: errors.New("possible unlock of locked mutex")},
-		stateChange{state: mutStateMayL, err: errors.New("possible runlock of locked mutex")},
+		stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
+		stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
+		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
+		stateChange{state: mutStateMayL, err: &invalidActError{reason: "?locked"}},
 	},
 }
 
@@ -103,12 +103,12 @@ func (m mutexAct) String() string {
 }
 
 type invalidStateError struct {
-	name             string
+	object           string
 	expected, actual mutexState
 }
 
 func (e invalidStateError) Error() string {
-	return fmt.Sprintf("mutex %q is in state %s, but expected state is %s", e.name, e.actual, e.expected)
+	return fmt.Sprintf("mutex %q is in state %s, but expected state is %s", e.object, e.actual, e.expected)
 }
 
 type invalidActError struct {
@@ -118,7 +118,10 @@ type invalidActError struct {
 }
 
 func (e invalidActError) Error() string {
-	result := fmt.Sprintf("%s cannot %q %s", e.subject, e.action, e.object)
+	result := fmt.Sprintf("cannot %q %s", e.action, e.object)
+	if len(e.subject) > 0 {
+		result = e.subject + " " + result
+	}
 	if len(e.reason) > 0 {
 		result = result + " [" + e.reason + "]"
 	}
@@ -127,7 +130,7 @@ func (e invalidActError) Error() string {
 
 type stateChange struct {
 	state mutexState
-	err   error
+	err   *invalidActError
 }
 
 type syntState struct {
@@ -138,7 +141,13 @@ func (ss *syntState) stateChange(name string, act mutexAct) error {
 	old := ss.mut[name]
 	change := stateTable[old][act]
 	ss.mut[name] = change.state
-	return change.err
+	if change.err == nil {
+		return nil
+	}
+	result := *change.err
+	result.action = act
+	result.object = name
+	return result
 }
 
 func (ss *syntState) ensureState(name string, state mutexState) error {
@@ -149,7 +158,7 @@ func (ss *syntState) ensureState(name string, state mutexState) error {
 	if state == mutStateR && curState == mutStateL {
 		return nil
 	}
-	return invalidStateError{name: name, actual: curState, expected: state}
+	return invalidStateError{object: name, actual: curState, expected: state}
 }
 
 type syntChecker struct {
@@ -187,6 +196,19 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 
 func (sc *syntChecker) check() {
 	ast.Walk(&funcVisitor{sc: sc}, sc.currentMD.node)
+}
+
+func (sc *syntChecker) onNewContext(node ast.Node) {
+	newSc := &syntChecker{
+		pkg: sc.pkg,
+		typ: sc.typ,
+		st:  &syntState{mut: make(map[string]mutexState)},
+		currentMD: &methodDesc{
+			obj: sc.currentMD.obj,
+		},
+	}
+	ast.Walk(&funcVisitor{sc: newSc}, node)
+	sc.reports = append(sc.reports, newSc.reports...)
 }
 
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
@@ -287,7 +309,7 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 		}
 		if aCalee.obj.selector().eq(aCaller.obj.selector()) {
 			if caleeName == "Lock" && callerName == "RLock" {
-				err = invalidStateError{name: aCalee.obj.selector().String(), actual: mutStateR, expected: mutStateR}
+				err = invalidStateError{object: aCalee.obj.selector().String(), actual: mutStateR, expected: mutStateL}
 			} else {
 				gotLock = true
 			}

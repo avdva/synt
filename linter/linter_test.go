@@ -42,8 +42,22 @@ func TestLinterParseComments(t *testing.T) {
 						},
 					},
 					"func3_1": methodDesc{},
+					"func3_2": methodDesc{
+						annotations: []annotation{
+							annotation{obj: idFromParts("t", "m", "Lock")},
+						},
+					},
+					"func3_3": methodDesc{},
+					"func3_4": methodDesc{
+						annotations: []annotation{
+							annotation{obj: idFromParts("t", "m", "RLock")},
+						},
+					},
+					"func3_5": methodDesc{},
+					"func3_6": methodDesc{},
 					"func4":   methodDesc{},
 					"func5":   methodDesc{},
+					"func6":   methodDesc{},
 					"getM":    methodDesc{},
 				},
 			},
@@ -67,11 +81,11 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func6")
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func5"]
+	func5Desc := sc.pkg.types["Type1"].methods["func6"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
@@ -98,11 +112,12 @@ func TestFunc3(t *testing.T) {
 			reason:  "annotation",
 		},
 	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
 	for i, rep := range sc.reports {
-		if !a.Equal(expected[i], rep.err) {
-
-		}
-		println(fmt.Sprintf("%s: %s", l.fs.Position(rep.pos).String(), rep.err))
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
 	}
 }
 
@@ -117,7 +132,171 @@ func TestFunc3_1(t *testing.T) {
 		return
 	}
 	sc.check()
-	for _, rep := range sc.reports {
+	expected := []error{
+		invalidStateError{
+			object:   "t.m",
+			expected: mutStateR,
+			actual:   mutStateUnlocked,
+		},
+		invalidStateError{
+			object:   "t.mut",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3_3(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_3")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	expected := []error{
+		invalidStateError{
+			object:   "t.m",
+			expected: mutStateL,
+			actual:   mutStateR,
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3_4(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_4")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	expected := []error{
+		invalidStateError{
+			object:   "t.m",
+			expected: mutStateL,
+			actual:   mutStateR,
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3_5(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_5")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	expected := []error{
+		invalidActError{
+			subject: "",
+			object:  "t.m",
+			action:  mutActRUnlock,
+			reason:  "not locked",
+		},
+		invalidActError{
+			subject: "",
+			object:  "t.m",
+			action:  mutActUnlock,
+			reason:  "not locked",
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc3_6(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_6")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	expected := []error{
+		invalidActError{
+			subject: "",
+			object:  "t.m",
+			action:  mutActUnlock,
+			reason:  "not locked",
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
+		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+	}
+}
+
+func TestFunc6(t *testing.T) {
+	a := assert.New(t)
+	l, err := makeLinter("./test/pkg1", "pkg1")
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func6")
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
+	expected := []error{
+		invalidStateError{
+			object:   "t.m",
+			expected: mutStateR,
+			actual:   mutStateUnlocked,
+		},
+		invalidStateError{
+			object:   "t.mut",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+		},
+	}
+	if !a.Equal(len(expected), len(sc.reports)) {
+		return
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
 		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
 	}
 }

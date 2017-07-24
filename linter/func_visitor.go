@@ -15,6 +15,7 @@ const (
 
 type stateChanger interface {
 	onExpr(op int, obj id, pos token.Pos)
+	onNewContext(node ast.Node)
 }
 
 type funcVisitor struct {
@@ -27,6 +28,7 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	}
 	switch typed := node.(type) {
 	case *ast.GoStmt:
+		fv.sc.onNewContext(typed.Call)
 		return nil
 	case *ast.IfStmt, *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
