@@ -93,11 +93,15 @@ func (t *Type1) func5() {
 }
 
 func (t *Type1) func6() {
+	freeFunc()
+	t.func1()
+	go t.func3_1(6)
 	go func() {
 		t.func3()
 	}()
-	a := func() int {
+	t.getM().RLock()
+	a := func(val float64) int {
 		return 0
-	}()
+	}(t.k)
 	_ = a
 }
