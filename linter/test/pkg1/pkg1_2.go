@@ -99,7 +99,7 @@ func (t *Type1) func6() {
 	go func() {
 		t.func3()
 	}()
-	t.getM().RLock()
+	t.self(0).ptr.self(t.func3()).getM().RLock()
 	a := func(val float64) int {
 		return 0
 	}(t.k)

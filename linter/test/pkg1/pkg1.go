@@ -12,6 +12,8 @@ type Type1 struct {
 	// synt: m.RLock
 	j int64
 
+	ptr *Type1
+
 	mut sync.Mutex
 	// synt: mut.Lock
 	k, l float64
@@ -40,6 +42,10 @@ func (t *Type1) func1() {
 // synt: t.m.Lock
 func (t Type1) func2() {
 
+}
+
+func (t *Type1) self(arg int) *Type1 {
+	return t
 }
 
 func freeFunc() {

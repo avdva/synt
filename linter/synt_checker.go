@@ -103,18 +103,21 @@ func (m mutexAct) String() string {
 }
 
 type invalidStateError struct {
-	object           string
-	expected, actual mutexState
+	object   string
+	expected mutexState
+	actual   mutexState
+	reason   string
 }
 
 func (e invalidStateError) Error() string {
-	return fmt.Sprintf("mutex %q is in state %s, but expected state is %s", e.object, e.actual, e.expected)
+	return fmt.Sprintf("mutex %q should be %s, but now is %s", e.object, e.expected, e.actual)
 }
 
 type invalidActError struct {
-	subject, object string
-	reason          string
-	action          mutexAct
+	subject string
+	object  string
+	action  mutexAct
+	reason  string
 }
 
 func (e invalidActError) Error() string {
@@ -147,10 +150,10 @@ func (ss *syntState) stateChange(name string, act mutexAct) error {
 	result := *change.err
 	result.action = act
 	result.object = name
-	return result
+	return &result
 }
 
-func (ss *syntState) ensureState(name string, state mutexState) error {
+func (ss *syntState) ensureState(name string, state mutexState) *invalidStateError {
 	curState := ss.mut[name]
 	if curState == state {
 		return nil
@@ -158,7 +161,7 @@ func (ss *syntState) ensureState(name string, state mutexState) error {
 	if state == mutStateR && curState == mutStateL {
 		return nil
 	}
-	return invalidStateError{object: name, actual: curState, expected: state}
+	return &invalidStateError{object: name, actual: curState, expected: state}
 }
 
 type syntChecker struct {
@@ -227,7 +230,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 	switch obj.name().String() {
 	case "Lock":
 		if !sc.canLock(obj) {
-			result = append(result, invalidActError{
+			result = append(result, &invalidActError{
 				subject: sc.currentMD.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActLock,
@@ -239,7 +242,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 		}
 	case "RLock":
 		if !sc.canLock(obj) {
-			result = append(result, invalidActError{
+			result = append(result, &invalidActError{
 				subject: sc.currentMD.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActRLock,
@@ -289,7 +292,7 @@ func (sc *syntChecker) checkExec(obj id) []error {
 		if gotLock, err := sc.checkCallerAnnotation(a); err != nil {
 			result = append(result, err)
 		} else if !gotLock {
-			if err = sc.st.ensureState(a.obj.selector().String(), state); err != nil {
+			if err := sc.st.ensureState(a.obj.selector().String(), state); err != nil {
 				result = append(result, err)
 			}
 		}
@@ -297,7 +300,7 @@ func (sc *syntChecker) checkExec(obj id) []error {
 	return result
 }
 
-func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err error) {
+func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err *invalidStateError) {
 	caleeName := aCalee.obj.name().String()
 	if caleeName != "Lock" && caleeName != "RLock" {
 		return
@@ -307,14 +310,19 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 		if callerName != "Lock" && callerName != "RLock" {
 			continue
 		}
-		if aCalee.obj.selector().eq(aCaller.obj.selector()) {
-			if caleeName == "Lock" && callerName == "RLock" {
-				err = invalidStateError{object: aCalee.obj.selector().String(), actual: mutStateR, expected: mutStateL}
-			} else {
-				gotLock = true
-			}
-			break
+		if !aCalee.obj.selector().eq(aCaller.obj.selector()) {
+			continue
 		}
+		if caleeName == "Lock" && callerName == "RLock" {
+			err = &invalidStateError{
+				object:   aCalee.obj.selector().String(),
+				actual:   mutStateR,
+				expected: mutStateL,
+			}
+		} else {
+			gotLock = true
+		}
+		break
 	}
 	return
 }

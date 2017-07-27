@@ -20,6 +20,14 @@ func (i id) String() string {
 	return strings.Join(i.parts, ".")
 }
 
+func (i id) len() int {
+	return len(i.parts)
+}
+
+func (i id) part(idx int) string {
+	return i.parts[idx]
+}
+
 func (i id) eq(other id) bool {
 	if len(i.parts) != len(other.parts) {
 		return false
@@ -38,6 +46,10 @@ func (i *id) name() id {
 
 func (i id) selector() id {
 	return id{parts: i.parts[:len(i.parts)-1]}
+}
+
+func (i *id) append(part string) {
+	i.parts = append(i.parts, part)
 }
 
 type annotation struct {
