@@ -58,6 +58,7 @@ func TestLinterParseComments(t *testing.T) {
 					"func4":   methodDesc{},
 					"func5":   methodDesc{},
 					"func6":   methodDesc{},
+					"func7":   methodDesc{},
 					"getM":    methodDesc{},
 					"self":    methodDesc{},
 				},
@@ -138,11 +139,13 @@ func TestFunc3_1(t *testing.T) {
 			object:   "t.m",
 			expected: mutStateR,
 			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
 		},
 		&invalidStateError{
 			object:   "t.mut",
 			expected: mutStateL,
 			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
 		},
 	}
 	if !a.Equal(len(expected), len(sc.reports)) {
@@ -170,6 +173,7 @@ func TestFunc3_3(t *testing.T) {
 			object:   "t.m",
 			expected: mutStateL,
 			actual:   mutStateR,
+			reason:   "in call to func3_2",
 		},
 	}
 	if !a.Equal(len(expected), len(sc.reports)) {
@@ -281,23 +285,49 @@ func TestFunc6(t *testing.T) {
 		return
 	}
 	sc.check()
-	/*expected := []error{
-		invalidStateError{
+	expected := []error{
+		&invalidStateError{
+			object:   "t.m",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+			reason:   "in call to func1",
+		},
+		&invalidStateError{
+			object:   "t.m",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+			reason:   "in call to func3_2",
+		},
+		&invalidStateError{
 			object:   "t.m",
 			expected: mutStateR,
 			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
 		},
-		invalidStateError{
+		&invalidStateError{
 			object:   "t.mut",
 			expected: mutStateL,
 			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
+		},
+		&invalidStateError{
+			object:   "t.m",
+			expected: mutStateR,
+			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
+		},
+		&invalidStateError{
+			object:   "t.mut",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
 		},
 	}
 	if !a.Equal(len(expected), len(sc.reports)) {
 		return
-	}*/
-	for _, rep := range sc.reports {
-		//a.Equal(expected[i], rep.err)
+	}
+	for i, rep := range sc.reports {
+		a.Equal(expected[i], rep.err)
 		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
 	}
 }

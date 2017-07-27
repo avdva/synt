@@ -110,7 +110,11 @@ type invalidStateError struct {
 }
 
 func (e invalidStateError) Error() string {
-	return fmt.Sprintf("mutex %q should be %s, but now is %s", e.object, e.expected, e.actual)
+	var pref string
+	if len(e.reason) > 0 {
+		pref = e.reason + ": "
+	}
+	return pref + fmt.Sprintf("mutex %q should be %s, but now is %s", e.object, e.expected, e.actual)
 }
 
 type invalidActError struct {
@@ -293,6 +297,7 @@ func (sc *syntChecker) checkExec(obj id) []error {
 			result = append(result, err)
 		} else if !gotLock {
 			if err := sc.st.ensureState(a.obj.selector().String(), state); err != nil {
+				err.reason = "in call to " + callee.obj.name().String()
 				result = append(result, err)
 			}
 		}

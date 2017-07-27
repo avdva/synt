@@ -96,11 +96,16 @@ func (t *Type1) func6() {
 	freeFunc()
 	t.func1()
 	go t.func3_1(6)
+	go t.func3_2()
 	go func() {
 		t.func3()
 	}()
 	t.self(0).ptr.self(t.func3()).getM().RLock()
+}
+
+func (t *Type1) func7() {
 	a := func(val float64) int {
+		t.func3()
 		return 0
 	}(t.k)
 	_ = a

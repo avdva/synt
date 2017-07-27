@@ -39,18 +39,10 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.CallExpr:
 		cv := &callVisitor{sc: fv.sc, parent: fv}
-		cid := cv.walk(typed)
+		cid := firstCall(cv.walk(typed))
 		if cid.len() > 0 {
-			fv.sc.onExpr(exprExec, cid, cv.firstCallPos())
+			fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
 		}
-		println("--- ", cid.String())
-		/*
-			for _, arg := range typed.Args {
-				ast.Walk(fv, arg)
-			}
-			if fl, ok := typed.Fun.(*ast.FuncLit); ok {
-				ast.Walk(fv, fl)
-			}*/
 		return nil
 	default:
 		sv := &simpleVisitor{sc: fv.sc}
@@ -63,19 +55,19 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 }
 
 type callVisitor struct {
-	sc     stateChanger
-	parent ast.Visitor
-	cid    id
-	fcp    token.Pos
+	sc      stateChanger
+	parent  ast.Visitor
+	callId  id
+	callPos []token.Pos
 }
 
 func (cv *callVisitor) walk(node ast.Node) id {
 	ast.Walk(cv, node)
-	return firstCall(cv.cid)
+	return cv.callId
 }
 
-func (cv *callVisitor) firstCallPos() token.Pos {
-	return cv.fcp
+func (cv *callVisitor) callPosAt(i int) token.Pos {
+	return cv.callPos[i]
 }
 
 func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
@@ -86,12 +78,9 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		// and then visit arguments.
 		if !isFuncLit {
 			ast.Walk(cv, typed.Fun)
-			n := cv.cid.name()
-			cv.cid = cv.cid.selector()
-			cv.cid.append(n.String() + "()")
-			if !strings.HasSuffix(n.String(), "()") {
-				cv.fcp = typed.Fun.Pos()
-			}
+			n := cv.callId.name()
+			cv.callId = cv.callId.selector()
+			cv.callId.append(n.String() + "()")
 		}
 		for _, arg := range typed.Args {
 			ast.Walk(cv.parent, arg)
@@ -103,10 +92,12 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.SelectorExpr:
 		ast.Walk(cv, typed.X)
-		cv.cid.append(typed.Sel.Name)
+		cv.callId.append(typed.Sel.Name)
+		cv.callPos = append(cv.callPos, typed.Sel.NamePos)
 		return nil
 	case *ast.Ident:
-		cv.cid.append(typed.Name)
+		cv.callId.append(typed.Name)
+		cv.callPos = append(cv.callPos, typed.NamePos)
 		return nil
 	}
 	return cv
