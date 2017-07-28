@@ -59,6 +59,8 @@ func TestLinterParseComments(t *testing.T) {
 					"func5":   methodDesc{},
 					"func6":   methodDesc{},
 					"func7":   methodDesc{},
+					"func8":   methodDesc{},
+					"func9":   methodDesc{},
 					"getM":    methodDesc{},
 					"self":    methodDesc{},
 				},
@@ -83,11 +85,11 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func6")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func9")
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func6"]
+	func5Desc := sc.pkg.types["Type1"].methods["func9"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
@@ -96,16 +98,6 @@ func TestFunc5(t *testing.T) {
 }
 
 func TestFunc3(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidActError{
 			subject: "func3",
@@ -114,26 +106,10 @@ func TestFunc3(t *testing.T) {
 			reason:  "annotation",
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3")
 }
 
 func TestFunc3_1(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_1")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
@@ -148,26 +124,10 @@ func TestFunc3_1(t *testing.T) {
 			reason:   "in call to func3",
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_1")
 }
 
 func TestFunc3_3(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_3")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
@@ -176,26 +136,10 @@ func TestFunc3_3(t *testing.T) {
 			reason:   "in call to func3_2",
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_3")
 }
 
 func TestFunc3_4(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_4")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
@@ -203,26 +147,10 @@ func TestFunc3_4(t *testing.T) {
 			actual:   mutStateR,
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_4")
 }
 
 func TestFunc3_5(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_5")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidActError{
 			subject: "",
@@ -237,26 +165,10 @@ func TestFunc3_5(t *testing.T) {
 			reason:  "not locked",
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_5")
 }
 
 func TestFunc3_6(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func3_6")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidActError{
 			subject: "",
@@ -265,26 +177,10 @@ func TestFunc3_6(t *testing.T) {
 			reason:  "not locked",
 		},
 	}
-	if !a.Equal(len(expected), len(sc.reports)) {
-		return
-	}
-	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_6")
 }
 
 func TestFunc6(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func6")
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
@@ -323,6 +219,67 @@ func TestFunc6(t *testing.T) {
 			reason:   "in call to func3",
 		},
 	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func6")
+}
+
+func TestFunc7(t *testing.T) {
+	expected := []error{
+		&invalidStateError{
+			object:   "t.mut",
+			expected: mutStateL,
+			actual:   mutStateUnlocked,
+			reason:   "in call to func3",
+		},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func7")
+}
+
+func TestFunc8(t *testing.T) {
+	expected := []error{
+		&invalidActError{
+			subject: "",
+			object:  "t.m",
+			action:  mutActLock,
+			reason:  "already locked",
+		},
+		&invalidStateError{
+			object:   "t.m",
+			expected: 2,
+			actual:   mutStateMayLR,
+			reason:   "in call to func3_4",
+		},
+		&invalidActError{
+			subject: "",
+			object:  "t.m",
+			action:  mutActUnlock,
+			reason:  "?rwlocked",
+		},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func8")
+}
+
+func TestFunc9(t *testing.T) {
+	doTypFuncTest(t, nil, "./test/pkg1", "pkg1", "Type1", "func9")
+}
+
+func TestCandle(t *testing.T) {
+	expected := []error{
+		&invalidActError{subject: "sourceExists", object: "sd.m", action: 1, reason: "annotation"},
+	}
+	doTypFuncTest(t, expected, "/home/avd/ol/olymp-candle-service/source-dispatcher", "dispatcher", "SourceDispatcher", "sourceExists")
+}
+
+func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {
+	a := assert.New(t)
+	l, err := makeLinter(path, pkg)
+	if !a.NoError(err) {
+		return
+	}
+	sc, err := makeSyntChecker(l.pkg, typ, fun)
+	if !a.NoError(err) {
+		return
+	}
+	sc.check()
 	if !a.Equal(len(expected), len(sc.reports)) {
 		return
 	}

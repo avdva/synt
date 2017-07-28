@@ -17,6 +17,7 @@ const (
 type stateChanger interface {
 	onExpr(op int, obj id, pos token.Pos)
 	onNewContext(node ast.Node)
+	onBranch(branches [][]ast.Node)
 }
 
 type visitContext struct {
@@ -35,7 +36,16 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.GoStmt:
 		fv.sc.onNewContext(typed.Call)
 		return nil
-	case *ast.IfStmt, *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
+	case *ast.IfStmt:
+		if typed.Init != nil {
+			ast.Walk(fv, typed.Init)
+		}
+		ast.Walk(fv, typed.Cond)
+		fv.sc.onBranch(expandIf(typed))
+		return nil
+	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
+		return nil
+	case *ast.DeferStmt:
 		return nil
 	case *ast.CallExpr:
 		cv := &callVisitor{sc: fv.sc, parent: fv}
@@ -44,12 +54,12 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 			fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
 		}
 		return nil
-	default:
+		/*default:
 		sv := &simpleVisitor{sc: fv.sc}
 		ast.Walk(sv, typed)
 		if sv.handled {
 			return nil
-		}
+		}*/
 	}
 	return fv
 }
@@ -150,6 +160,28 @@ func expandCall(node ast.Node) []string {
 		return expanded
 	}
 	return nil
+}
+
+func expandIf(node *ast.IfStmt) [][]ast.Node {
+	result := [][]ast.Node{[]ast.Node{node.Body}}
+	for elseNode := node.Else; elseNode != nil; {
+		if ifStmt, ok := elseNode.(*ast.IfStmt); ok {
+			var arr []ast.Node
+			if ifStmt.Init != nil {
+				arr = append(arr, ifStmt.Init)
+			}
+			if ifStmt.Cond != nil {
+				arr = append(arr, ifStmt.Cond)
+			}
+			arr = append(arr, ifStmt.Body)
+			result = append(result, arr)
+			elseNode = ifStmt.Else
+		} else {
+			result = append(result, []ast.Node{elseNode})
+			break
+		}
+	}
+	return result
 }
 
 func firstCall(call id) id {

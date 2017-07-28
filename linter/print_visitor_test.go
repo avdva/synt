@@ -45,6 +45,7 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.IfStmt:
 		ast.Walk(&printVisitor{level: fv.level + 1, w: fv.w}, typed.Body)
 		if isif, ok := typed.Else.(*ast.IfStmt); ok {
+			fv.w.Write([]byte("else "))
 			ast.Walk(&printVisitor{level: fv.level, w: fv.w}, isif)
 		} else if typed.Else != nil {
 			fv.w.Write([]byte(strings.Repeat(" ", fv.level*2)))

@@ -105,8 +105,46 @@ func (t *Type1) func6() {
 
 func (t *Type1) func7() {
 	a := func(val float64) int {
+		t.m.Lock()
 		t.func3()
 		return 0
 	}(t.k)
 	_ = a
+}
+
+func (t *Type1) func8() {
+	a := 0
+	if a == 0 {
+		t.m.RLock()
+	} else if a == 1 {
+		a = 5
+	} else {
+		t.m.Lock()
+		t.m.Lock()
+	}
+	t.func3_4()
+	t.m.Unlock()
+}
+
+func (t *Type1) func9() {
+	a, b := 0, 0
+	t.m.Lock()
+	t.m.Unlock()
+	if a == 0 {
+		if b == 3 {
+			t.m.Lock()
+		} else {
+			t.m.Lock()
+		}
+	} else if a == 4 {
+		t.m.Lock()
+	} else {
+		t.m.Lock()
+	}
+	if true {
+		t.mut.Lock()
+	} else {
+		t.mut.Unlock()
+	}
+	t.func3()
 }

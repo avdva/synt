@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const mutStateUnknown = -1
+
 const (
 	mutStateUnlocked = iota
 	mutStateL
@@ -26,45 +28,68 @@ const (
 	mutActRUnlock
 )
 
-// stateTable shows how mutex state change in response to mutex actions.
-var stateTable = [][]stateChange{
-	[]stateChange{ // state is Unlocked
-		stateChange{state: mutStateL, err: nil},
-		stateChange{state: mutStateR, err: nil},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
-	},
-	[]stateChange{ // state is Locked
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
-		stateChange{state: mutStateUnlocked, err: nil},
-		stateChange{state: mutStateL, err: &invalidActError{reason: "locked"}},
-	},
-	[]stateChange{ // state is Rlocked
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
-		stateChange{state: mutStateR, err: &invalidActError{reason: "already rlocked"}},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "rlocked"}},
-		stateChange{state: mutStateUnlocked, err: nil},
-	},
-	[]stateChange{ // state is may be Locked
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
-		stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
-		stateChange{state: mutStateUnlocked, err: nil},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?locked"}},
-	},
-	[]stateChange{ // state is may be RLocked
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
-		stateChange{state: mutStateMayR, err: &invalidActError{reason: "already rlocked"}},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
-		stateChange{state: mutStateUnlocked, err: nil},
-	},
-	[]stateChange{ // state is may be RLocked and Locked
-		stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
-		stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
-		stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
-		stateChange{state: mutStateMayL, err: &invalidActError{reason: "?locked"}},
-	},
-}
+var (
+	// stateChangeTable shows how mutex state changes in response to mutex actions.
+	stateChangeTable = [][]stateChange{
+		[]stateChange{ // state is Unlocked
+			stateChange{state: mutStateL, err: nil},
+			stateChange{state: mutStateR, err: nil},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
+		},
+		[]stateChange{ // state is Locked
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
+			stateChange{state: mutStateUnlocked, err: nil},
+			stateChange{state: mutStateL, err: &invalidActError{reason: "locked"}},
+		},
+		[]stateChange{ // state is Rlocked
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{state: mutStateR, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "rlocked"}},
+			stateChange{state: mutStateUnlocked, err: nil},
+		},
+		[]stateChange{ // state is may be Locked
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{state: mutStateUnlocked, err: nil},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?locked"}},
+		},
+		[]stateChange{ // state is may be RLocked
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{state: mutStateMayR, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
+			stateChange{state: mutStateUnlocked, err: nil},
+		},
+		[]stateChange{ // state is may be RLocked and Locked
+			stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rwlocked"}},
+			stateChange{state: mutStateMayL, err: &invalidActError{reason: "?rwlocked"}},
+		},
+	}
+	// stateMergeTable maps two states from branches of code into a result one.
+	stateMergeTable = [][]mutexState{
+		[]mutexState{ // mutStateUnlocked
+			mutStateUnlocked, mutStateL, mutStateR, mutStateMayL, mutStateMayR, mutStateMayLR,
+		},
+		[]mutexState{ // mutStateL
+			mutStateMayL, mutStateL, mutStateMayLR, mutStateMayL, mutStateMayLR, mutStateMayLR,
+		},
+		[]mutexState{ // mutStateR
+			mutStateMayR, mutStateMayLR, mutStateR, mutStateMayLR, mutStateMayR, mutStateMayLR,
+		},
+		[]mutexState{ // mutStateMayL
+			mutStateMayL, mutStateMayL, mutStateMayLR, mutStateMayL, mutStateMayLR, mutStateMayLR,
+		},
+		[]mutexState{ // mutStateMayR
+			mutStateMayR, mutStateMayLR, mutStateMayR, mutStateMayLR, mutStateMayR, mutStateMayLR,
+		},
+		[]mutexState{ // mutStateMayLR
+			mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR,
+		},
+	}
+)
 
 type mutexState int
 
@@ -144,9 +169,25 @@ type syntState struct {
 	mut map[string]mutexState
 }
 
+func newSyntState() *syntState {
+	return &syntState{mut: make(map[string]mutexState)}
+}
+
+func (ss *syntState) set(name string, state mutexState) {
+	ss.mut[name] = state
+}
+
+func (ss *syntState) mutState(name string) (mutexState, bool) {
+	state, found := ss.mut[name]
+	if !found {
+		state = mutStateUnlocked
+	}
+	return state, found
+}
+
 func (ss *syntState) stateChange(name string, act mutexAct) error {
-	old := ss.mut[name]
-	change := stateTable[old][act]
+	old, _ := ss.mutState(name)
+	change := stateChangeTable[old][act]
 	ss.mut[name] = change.state
 	if change.err == nil {
 		return nil
@@ -158,7 +199,7 @@ func (ss *syntState) stateChange(name string, act mutexAct) error {
 }
 
 func (ss *syntState) ensureState(name string, state mutexState) *invalidStateError {
-	curState := ss.mut[name]
+	curState, _ := ss.mutState(name)
 	if curState == state {
 		return nil
 	}
@@ -182,7 +223,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		pkg: pkg,
 		typ: typ,
 		fun: fun,
-		st:  &syntState{mut: make(map[string]mutexState)},
+		st:  newSyntState(),
 	}
 	if len(result.typ) > 0 {
 		if typDesc, found := result.pkg.types[result.typ]; found {
@@ -201,21 +242,69 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	return result
 }
 
-func (sc *syntChecker) check() {
+func (sc *syntChecker) check() []Report {
 	ast.Walk(&funcVisitor{sc: sc}, sc.currentMD.node)
+	return sc.reports
 }
 
 func (sc *syntChecker) onNewContext(node ast.Node) {
 	newSc := &syntChecker{
 		pkg: sc.pkg,
 		typ: sc.typ,
-		st:  &syntState{mut: make(map[string]mutexState)},
+		st:  newSyntState(),
 		currentMD: &methodDesc{
 			obj: sc.currentMD.obj,
 		},
 	}
 	ast.Walk(&funcVisitor{sc: newSc}, node)
 	sc.reports = append(sc.reports, newSc.reports...)
+}
+
+func (sc *syntChecker) mergeStates(states []*syntState) {
+	allNames := make(map[string]struct{})
+	for _, state := range states {
+		for k := range state.mut {
+			allNames[k] = struct{}{}
+		}
+	}
+	newState := newSyntState()
+	for name, _ := range allNames {
+		mutState := mutexState(mutStateUnknown)
+		for _, state := range states {
+			stateFromBranch, found := state.mutState(name)
+			if !found {
+				continue
+			}
+			if mutState == mutStateUnknown {
+				mutState = stateFromBranch
+				continue
+			}
+			if mutState == stateFromBranch {
+				continue
+			}
+			mutState = stateMergeTable[mutState][stateFromBranch]
+		}
+		newState.set(name, mutState)
+	}
+	sc.st = newState
+}
+
+func (sc *syntChecker) onBranch(branches [][]ast.Node) {
+	var states []*syntState
+	for _, branch := range branches {
+		newSc := &syntChecker{
+			pkg:       sc.pkg,
+			typ:       sc.typ,
+			st:        copyState(sc.st),
+			currentMD: sc.currentMD,
+		}
+		for _, node := range branch {
+			ast.Walk(&funcVisitor{sc: newSc}, node)
+		}
+		sc.reports = append(sc.reports, newSc.reports...)
+		states = append(states, newSc.st)
+	}
+	sc.mergeStates(states)
 }
 
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
@@ -339,4 +428,12 @@ func (sc *syntChecker) canLock(obj id) bool {
 		}
 	}
 	return true
+}
+
+func copyState(st *syntState) *syntState {
+	result := newSyntState()
+	for k, v := range st.mut {
+		result.mut[k] = v
+	}
+	return result
 }

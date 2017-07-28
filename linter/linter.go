@@ -18,14 +18,28 @@ type Report struct {
 	err error
 }
 
+func (r Report) Error() error {
+	return r.err
+}
+
+func (r Report) Pos() token.Pos {
+	return r.pos
+}
+
 func New(fs *token.FileSet, pkg *ast.Package) *Linter {
 	return &Linter{fs: fs, pkg: pkg}
 }
 
 func (l *Linter) Do() []Report {
+	var result []Report
 	desc := makePkgDesc(l.pkg)
-	_ = desc
-	return nil
+	for typName, typDesc := range desc.types {
+		for methodName := range typDesc.methods {
+			sc := newSyntChecker(desc, typName, methodName)
+			result = append(result, sc.check()...)
+		}
+	}
+	return result
 }
 
 func makePkgDesc(pkg *ast.Package) *pkgDesc {
