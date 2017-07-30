@@ -24,12 +24,13 @@ type visitContext struct {
 }
 
 type funcVisitor struct {
-	vc *visitContext
-	sc stateChanger
+	vc      *visitContext
+	sc      stateChanger
+	discard bool
 }
 
 func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
-	if node == nil {
+	if node == nil || fv.discard {
 		return nil
 	}
 	switch typed := node.(type) {
@@ -53,6 +54,9 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		if cid.len() > 0 {
 			fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
 		}
+		return nil
+	case *ast.ReturnStmt:
+		fv.discard = true
 		return nil
 		/*default:
 		sv := &simpleVisitor{sc: fv.sc}

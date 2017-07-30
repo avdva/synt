@@ -6,3 +6,8 @@ Synt is a linter for Golang code, that specialises on synchronization errors.
 
 This package is made available under an Apache License 2.0. See
 LICENSE and NOTICE.
+
+1) defer
+2) renames
+3) other branches
+4) read/writes

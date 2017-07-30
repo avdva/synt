@@ -259,14 +259,18 @@ func TestFunc8(t *testing.T) {
 }
 
 func TestFunc9(t *testing.T) {
-	doTypFuncTest(t, nil, "./test/pkg1", "pkg1", "Type1", "func9")
+	expected := []error{
+		&invalidActError{subject: "", object: "t.mut", action: 2, reason: "not locked"},
+		&invalidStateError{object: "t.mut", expected: 1, actual: 3, reason: "in call to func3"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func9")
 }
 
 func TestCandle(t *testing.T) {
 	expected := []error{
 		&invalidActError{subject: "sourceExists", object: "sd.m", action: 1, reason: "annotation"},
 	}
-	doTypFuncTest(t, expected, "/home/avd/ol/olymp-candle-service/source-dispatcher", "dispatcher", "SourceDispatcher", "sourceExists")
+	doTypFuncTest(t, expected, "/home/avd/dev/godev/src/olymptrade.com/olymp-candle-service/processor", "dispatcher", "SourceDispatcher", "sourceExists")
 }
 
 func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {

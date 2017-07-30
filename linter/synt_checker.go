@@ -290,7 +290,7 @@ func (sc *syntChecker) mergeStates(states []*syntState) {
 }
 
 func (sc *syntChecker) onBranch(branches [][]ast.Node) {
-	var states []*syntState
+	states := []*syntState{sc.st}
 	for _, branch := range branches {
 		newSc := &syntChecker{
 			pkg:       sc.pkg,
@@ -298,11 +298,16 @@ func (sc *syntChecker) onBranch(branches [][]ast.Node) {
 			st:        copyState(sc.st),
 			currentMD: sc.currentMD,
 		}
+		var discard bool
 		for _, node := range branch {
-			ast.Walk(&funcVisitor{sc: newSc}, node)
+			fv := &funcVisitor{sc: newSc}
+			ast.Walk(fv, node)
+			discard = fv.discard
 		}
 		sc.reports = append(sc.reports, newSc.reports...)
-		states = append(states, newSc.st)
+		if !discard {
+			states = append(states, newSc.st)
+		}
 	}
 	sc.mergeStates(states)
 }
