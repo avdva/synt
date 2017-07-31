@@ -12,6 +12,10 @@ const (
 	exprRead = iota
 	exprWrite
 	exprExec
+
+	exitNormal = 0
+	exitReturn = 1
+	exitPanic  = 2
 )
 
 type stateChanger interface {
@@ -23,14 +27,28 @@ type stateChanger interface {
 type visitContext struct {
 }
 
+type visitResult struct {
+	defers   []ast.Node
+	exitType int
+}
+
 type funcVisitor struct {
-	vc      *visitContext
-	sc      stateChanger
-	discard bool
+	vc *visitContext
+	sc stateChanger
+	vr visitResult
+}
+
+func newFuncVisitor(sc stateChanger) *funcVisitor {
+	return &funcVisitor{sc: sc}
+}
+
+func (fv *funcVisitor) walk(node ast.Node) visitResult {
+	ast.Walk(fv, node)
+	return fv.vr
 }
 
 func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
-	if node == nil || fv.discard {
+	if node == nil || fv.vr.exitType != exitNormal {
 		return nil
 	}
 	switch typed := node.(type) {
@@ -47,23 +65,21 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
 	case *ast.DeferStmt:
+		fv.vr.defers = append(fv.vr.defers, typed.Call)
 		return nil
 	case *ast.CallExpr:
 		cv := &callVisitor{sc: fv.sc, parent: fv}
 		cid := firstCall(cv.walk(typed))
 		if cid.len() > 0 {
+			if cid.String() == "panic" {
+				fv.vr.exitType = exitPanic
+			}
 			fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
 		}
 		return nil
 	case *ast.ReturnStmt:
-		fv.discard = true
+		fv.vr.exitType = exitReturn
 		return nil
-		/*default:
-		sv := &simpleVisitor{sc: fv.sc}
-		ast.Walk(sv, typed)
-		if sv.handled {
-			return nil
-		}*/
 	}
 	return fv
 }

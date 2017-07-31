@@ -71,7 +71,7 @@ var (
 	// stateMergeTable maps two states from branches of code into a result one.
 	stateMergeTable = [][]mutexState{
 		[]mutexState{ // mutStateUnlocked
-			mutStateUnlocked, mutStateL, mutStateR, mutStateMayL, mutStateMayR, mutStateMayLR,
+			mutStateUnlocked, mutStateMayL, mutStateR, mutStateMayL, mutStateMayR, mutStateMayLR,
 		},
 		[]mutexState{ // mutStateL
 			mutStateMayL, mutStateL, mutStateMayLR, mutStateMayL, mutStateMayLR, mutStateMayLR,
@@ -243,7 +243,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 }
 
 func (sc *syntChecker) check() []Report {
-	ast.Walk(&funcVisitor{sc: sc}, sc.currentMD.node)
+	ast.Walk(newFuncVisitor(sc), sc.currentMD.node)
 	return sc.reports
 }
 
@@ -260,7 +260,7 @@ func (sc *syntChecker) onNewContext(node ast.Node) {
 	sc.reports = append(sc.reports, newSc.reports...)
 }
 
-func (sc *syntChecker) mergeStates(states []*syntState) {
+func mergeStates(states []*syntState) *syntState {
 	allNames := make(map[string]struct{})
 	for _, state := range states {
 		for k := range state.mut {
@@ -271,10 +271,10 @@ func (sc *syntChecker) mergeStates(states []*syntState) {
 	for name, _ := range allNames {
 		mutState := mutexState(mutStateUnknown)
 		for _, state := range states {
-			stateFromBranch, found := state.mutState(name)
-			if !found {
+			stateFromBranch, _ := state.mutState(name)
+			/*if !found {
 				continue
-			}
+			}*/
 			if mutState == mutStateUnknown {
 				mutState = stateFromBranch
 				continue
@@ -286,30 +286,33 @@ func (sc *syntChecker) mergeStates(states []*syntState) {
 		}
 		newState.set(name, mutState)
 	}
-	sc.st = newState
+	return newState
 }
 
 func (sc *syntChecker) onBranch(branches [][]ast.Node) {
-	states := []*syntState{sc.st}
+	var states []*syntState
+	var results []visitResult
 	for _, branch := range branches {
+		var result visitResult
 		newSc := &syntChecker{
 			pkg:       sc.pkg,
 			typ:       sc.typ,
 			st:        copyState(sc.st),
 			currentMD: sc.currentMD,
 		}
-		var discard bool
+		fv := newFuncVisitor(newSc)
 		for _, node := range branch {
-			fv := &funcVisitor{sc: newSc}
-			ast.Walk(fv, node)
-			discard = fv.discard
+			result = fv.walk(node)
 		}
 		sc.reports = append(sc.reports, newSc.reports...)
-		if !discard {
+		results = append(results, result)
+		if result.exitType == exitNormal {
 			states = append(states, newSc.st)
 		}
 	}
-	sc.mergeStates(states)
+	if len(states) > 0 {
+		sc.st = mergeStates(states)
+	}
 }
 
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {

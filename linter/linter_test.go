@@ -60,7 +60,8 @@ func TestLinterParseComments(t *testing.T) {
 					"func6":   methodDesc{},
 					"func7":   methodDesc{},
 					"func8":   methodDesc{},
-					"func9":   methodDesc{},
+					"func10":  methodDesc{},
+					"func11":  methodDesc{},
 					"getM":    methodDesc{},
 					"self":    methodDesc{},
 				},
@@ -264,6 +265,20 @@ func TestFunc9(t *testing.T) {
 		&invalidStateError{object: "t.mut", expected: 1, actual: 3, reason: "in call to func3"},
 	}
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func9")
+}
+
+func TestFunc10(t *testing.T) {
+	expected := []error{
+		&invalidStateError{object: "t.m", expected: 1, actual: 3, reason: "in call to func3_2"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func10")
+}
+
+func TestFunc11(t *testing.T) {
+	expected := []error{
+	//&invalidStateError{object: "t.m", expected: 1, actual: 3, reason: "in call to func3_2"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func11")
 }
 
 func TestCandle(t *testing.T) {

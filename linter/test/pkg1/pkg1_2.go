@@ -148,3 +148,35 @@ func (t *Type1) func9() {
 	}
 	t.func3()
 }
+
+func (t *Type1) func10() {
+	a := 0
+	if a == 0 {
+	} else {
+		t.m.Lock()
+	}
+	t.func3_2()
+}
+
+func (t *Type1) func11() {
+	a := 0
+	if a == 0 {
+		t.m.Lock()
+		return
+	} else if a == 1 {
+		t.m.Lock()
+		panic("dsf")
+	} else {
+		t.m.Lock()
+	}
+	t.func3_2()
+}
+
+func (t *Type1) func12() {
+	a := 0
+	t.m.Lock()
+	if a == 0 {
+		defer t.m.Lock()
+	}
+	defer t.m.Unlock()
+}
