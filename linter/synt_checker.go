@@ -260,36 +260,7 @@ func (sc *syntChecker) onNewContext(node ast.Node) {
 	sc.reports = append(sc.reports, newSc.reports...)
 }
 
-func mergeStates(states []*syntState) *syntState {
-	allNames := make(map[string]struct{})
-	for _, state := range states {
-		for k := range state.mut {
-			allNames[k] = struct{}{}
-		}
-	}
-	newState := newSyntState()
-	for name, _ := range allNames {
-		mutState := mutexState(mutStateUnknown)
-		for _, state := range states {
-			stateFromBranch, _ := state.mutState(name)
-			/*if !found {
-				continue
-			}*/
-			if mutState == mutStateUnknown {
-				mutState = stateFromBranch
-				continue
-			}
-			if mutState == stateFromBranch {
-				continue
-			}
-			mutState = stateMergeTable[mutState][stateFromBranch]
-		}
-		newState.set(name, mutState)
-	}
-	return newState
-}
-
-func (sc *syntChecker) onBranch(branches [][]ast.Node) {
+func (sc *syntChecker) onBranch(branches [][]ast.Node) []visitResult {
 	var states []*syntState
 	var results []visitResult
 	for _, branch := range branches {
@@ -313,6 +284,7 @@ func (sc *syntChecker) onBranch(branches [][]ast.Node) {
 	if len(states) > 0 {
 		sc.st = mergeStates(states)
 	}
+	return results
 }
 
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
@@ -436,6 +408,32 @@ func (sc *syntChecker) canLock(obj id) bool {
 		}
 	}
 	return true
+}
+
+func mergeStates(states []*syntState) *syntState {
+	allNames := make(map[string]struct{})
+	for _, state := range states {
+		for k := range state.mut {
+			allNames[k] = struct{}{}
+		}
+	}
+	newState := newSyntState()
+	for name, _ := range allNames {
+		mutState := mutexState(mutStateUnknown)
+		for _, state := range states {
+			stateFromBranch, _ := state.mutState(name)
+			if mutState == mutStateUnknown {
+				mutState = stateFromBranch
+				continue
+			}
+			if mutState == stateFromBranch {
+				continue
+			}
+			mutState = stateMergeTable[mutState][stateFromBranch]
+		}
+		newState.set(name, mutState)
+	}
+	return newState
 }
 
 func copyState(st *syntState) *syntState {

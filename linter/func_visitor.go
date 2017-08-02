@@ -21,15 +21,20 @@ const (
 type stateChanger interface {
 	onExpr(op int, obj id, pos token.Pos)
 	onNewContext(node ast.Node)
-	onBranch(branches [][]ast.Node)
+	onBranch(branches [][]ast.Node) []visitResult
 }
 
-type visitContext struct {
+type deferItem struct {
+	call   ast.Node
+	branch []*deferItem
 }
 
 type visitResult struct {
-	defers   []ast.Node
+	defers   []deferItem
 	exitType int
+}
+
+type visitContext struct {
 }
 
 type funcVisitor struct {
@@ -60,12 +65,12 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(fv, typed.Init)
 		}
 		ast.Walk(fv, typed.Cond)
-		fv.sc.onBranch(expandIf(typed))
+		results := fv.sc.onBranch(expandIf(typed))
 		return nil
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
 	case *ast.DeferStmt:
-		fv.vr.defers = append(fv.vr.defers, typed.Call)
+		fv.vr.defers = append(fv.vr.defers, deferItem{call: typed.Call})
 		return nil
 	case *ast.CallExpr:
 		cv := &callVisitor{sc: fv.sc, parent: fv}

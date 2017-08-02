@@ -59,7 +59,6 @@ func doPackage(fs *token.FileSet, pkg *ast.Package) bool {
 	//sort.Sort(reports)
 	for _, report := range reports {
 		fmt.Printf("%s: %s\n", report.Error().Error(), fs.Position(report.Pos()).String())
-		//errorf("%s: %s is unused", fs.Position(report.Pos), report.Name)
 	}
 	return len(reports) == 0
 }
