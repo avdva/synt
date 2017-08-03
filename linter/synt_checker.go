@@ -243,7 +243,8 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 }
 
 func (sc *syntChecker) check() []Report {
-	ast.Walk(newFuncVisitor(sc), sc.currentMD.node)
+	fv := newFuncVisitor(sc, true)
+	fv.walk(sc.currentMD.node)
 	return sc.reports
 }
 
@@ -271,7 +272,7 @@ func (sc *syntChecker) onBranch(branches [][]ast.Node) []visitResult {
 			st:        copyState(sc.st),
 			currentMD: sc.currentMD,
 		}
-		fv := newFuncVisitor(newSc)
+		fv := newFuncVisitor(newSc, false)
 		for _, node := range branch {
 			result = fv.walk(node)
 		}

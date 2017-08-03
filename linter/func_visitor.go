@@ -25,8 +25,8 @@ type stateChanger interface {
 }
 
 type deferItem struct {
-	call   ast.Node
-	branch []*deferItem
+	call     ast.Node
+	branches [][]deferItem
 }
 
 type visitResult struct {
@@ -38,17 +38,28 @@ type visitContext struct {
 }
 
 type funcVisitor struct {
-	vc *visitContext
-	sc stateChanger
-	vr visitResult
+	vc   *visitContext
+	sc   stateChanger
+	vr   visitResult
+	root bool
 }
 
-func newFuncVisitor(sc stateChanger) *funcVisitor {
-	return &funcVisitor{sc: sc}
+func newFuncVisitor(sc stateChanger, root bool) *funcVisitor {
+	return &funcVisitor{sc: sc, root: root}
 }
 
 func (fv *funcVisitor) walk(node ast.Node) visitResult {
 	ast.Walk(fv, node)
+	if fv.root {
+		for i := len(fv.vr.defers) - 1; i >= 0; i-- {
+			di := fv.vr.defers[i]
+			if call := di.call; call != nil {
+				ast.Walk(fv, call)
+			} else {
+				println(len(di.branches))
+			}
+		}
+	}
 	return fv.vr
 }
 
@@ -64,8 +75,15 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		if typed.Init != nil {
 			ast.Walk(fv, typed.Init)
 		}
-		ast.Walk(fv, typed.Cond)
+		if typed.Cond != nil {
+			ast.Walk(fv, typed.Cond)
+		}
 		results := fv.sc.onBranch(expandIf(typed))
+		var di deferItem
+		for _, r := range results {
+			di.branches = append(di.branches, r.defers)
+		}
+		fv.vr.defers = append(fv.vr.defers, di)
 		return nil
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
@@ -122,7 +140,8 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 		// if it is a func literal, visit it after visiting all args.
 		if isFuncLit {
-			ast.Walk(cv.parent, fl)
+			v := newFuncVisitor(cv.sc, true)
+			v.walk(fl)
 		}
 		return nil
 	case *ast.SelectorExpr:

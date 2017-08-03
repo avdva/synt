@@ -173,10 +173,31 @@ func (t *Type1) func11() {
 }
 
 func (t *Type1) func12() {
+	t.m.Lock()
+	defer t.m.Unlock()
+	defer t.m.Unlock()
+	defer func() {
+		t.m.Lock()
+	}()
+}
+
+func (t *Type1) func13() {
+	t.m.Lock()
+	func() {
+		defer t.m.Unlock()
+	}()
+	defer t.m.Lock()
+}
+
+func (t *Type1) func14() {
 	a := 0
 	t.m.Lock()
-	if a == 0 {
-		defer t.m.Lock()
-	}
 	defer t.m.Unlock()
+	if a == 0 {
+		defer t.m.Unlock()
+	} else if a == 1 {
+		defer t.m.RUnlock()
+	} else {
+
+	}
 }

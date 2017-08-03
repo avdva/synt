@@ -281,6 +281,26 @@ func TestFunc11(t *testing.T) {
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func11")
 }
 
+func TestFunc12(t *testing.T) {
+	expected := []error{
+		&invalidActError{subject: "", object: "t.m", action: 0, reason: "already locked"},
+		&invalidActError{subject: "", object: "t.m", action: 2, reason: "not locked"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func12")
+}
+
+func TestFunc13(t *testing.T) {
+	expected := []error{}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func13")
+}
+
+func TestFunc14(t *testing.T) {
+	expected := []error{
+	//&invalidActError{subject: "", object: "t.m", action: 2, reason: "not locked"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func14")
+}
+
 func TestCandle(t *testing.T) {
 	expected := []error{
 		&invalidActError{subject: "sourceExists", object: "sd.m", action: 1, reason: "annotation"},
