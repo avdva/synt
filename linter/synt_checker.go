@@ -213,6 +213,7 @@ type syntChecker struct {
 	pkg       *pkgDesc
 	typ       string
 	fun       string
+	branches  []stateChanger
 	st        *syntState
 	currentMD *methodDesc
 	reports   []Report
@@ -261,31 +262,32 @@ func (sc *syntChecker) onNewContext(node ast.Node) {
 	sc.reports = append(sc.reports, newSc.reports...)
 }
 
-func (sc *syntChecker) onBranch(branches [][]ast.Node) []visitResult {
-	var states []*syntState
-	var results []visitResult
-	for _, branch := range branches {
-		var result visitResult
+func (sc *syntChecker) branchStart(count int) []stateChanger {
+	for i := 0; i < count; i++ {
 		newSc := &syntChecker{
 			pkg:       sc.pkg,
 			typ:       sc.typ,
 			st:        copyState(sc.st),
 			currentMD: sc.currentMD,
 		}
-		fv := newFuncVisitor(newSc, false)
-		for _, node := range branch {
-			result = fv.walk(node)
-		}
-		sc.reports = append(sc.reports, newSc.reports...)
-		results = append(results, result)
+		sc.branches = append(sc.branches, newSc)
+	}
+	return sc.branches
+}
+
+func (sc *syntChecker) branchEnd(results []visitResult) {
+	var states []*syntState
+	for i, result := range results {
+		bsc := sc.branches[i].(*syntChecker)
+		sc.reports = append(sc.reports, bsc.reports...)
 		if result.exitType == exitNormal {
-			states = append(states, newSc.st)
+			states = append(states, bsc.st)
 		}
 	}
 	if len(states) > 0 {
 		sc.st = mergeStates(states)
 	}
-	return results
+	sc.branches = nil
 }
 
 func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {

@@ -21,7 +21,8 @@ const (
 type stateChanger interface {
 	onExpr(op int, obj id, pos token.Pos)
 	onNewContext(node ast.Node)
-	onBranch(branches [][]ast.Node) []visitResult
+	branchStart(count int) []stateChanger
+	branchEnd([]visitResult)
 }
 
 type deferItem struct {
@@ -51,14 +52,7 @@ func newFuncVisitor(sc stateChanger, root bool) *funcVisitor {
 func (fv *funcVisitor) walk(node ast.Node) visitResult {
 	ast.Walk(fv, node)
 	if fv.root {
-		for i := len(fv.vr.defers) - 1; i >= 0; i-- {
-			di := fv.vr.defers[i]
-			if call := di.call; call != nil {
-				ast.Walk(fv, call)
-			} else {
-				println(len(di.branches))
-			}
-		}
+		fv.handleDefers()
 	}
 	return fv.vr
 }
@@ -72,18 +66,7 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		fv.sc.onNewContext(typed.Call)
 		return nil
 	case *ast.IfStmt:
-		if typed.Init != nil {
-			ast.Walk(fv, typed.Init)
-		}
-		if typed.Cond != nil {
-			ast.Walk(fv, typed.Cond)
-		}
-		results := fv.sc.onBranch(expandIf(typed))
-		var di deferItem
-		for _, r := range results {
-			di.branches = append(di.branches, r.defers)
-		}
-		fv.vr.defers = append(fv.vr.defers, di)
+		fv.handleIf(typed)
 		return nil
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
@@ -91,20 +74,83 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		fv.vr.defers = append(fv.vr.defers, deferItem{call: typed.Call})
 		return nil
 	case *ast.CallExpr:
-		cv := &callVisitor{sc: fv.sc, parent: fv}
-		cid := firstCall(cv.walk(typed))
-		if cid.len() > 0 {
-			if cid.String() == "panic" {
-				fv.vr.exitType = exitPanic
-			}
-			fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
-		}
+		fv.handleCall(typed)
 		return nil
 	case *ast.ReturnStmt:
 		fv.vr.exitType = exitReturn
 		return nil
 	}
 	return fv
+}
+
+func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
+	var di deferItem
+	var results []visitResult
+	if stmt.Init != nil {
+		ast.Walk(fv, stmt.Init)
+	}
+	if stmt.Cond != nil {
+		ast.Walk(fv, stmt.Cond)
+	}
+	branches := expandIf(stmt)
+	changers := fv.sc.branchStart(len(branches))
+	for i, branch := range branches {
+		var result visitResult
+		fv := newFuncVisitor(changers[i], false)
+		for _, node := range branch {
+			result = fv.walk(node) // TODO(avd) - is it to correct to leave last result only?
+		}
+		results = append(results, result)
+		di.branches = append(di.branches, result.defers)
+	}
+	fv.sc.branchEnd(results)
+	fv.vr.defers = append(fv.vr.defers, di)
+}
+
+func (fv *funcVisitor) handleCall(expr *ast.CallExpr) {
+	cv := &callVisitor{sc: fv.sc, parent: fv}
+	cid := firstCall(cv.walk(expr))
+	if cid.len() > 0 {
+		if cid.String() == "panic" {
+			fv.vr.exitType = exitPanic
+		}
+		fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
+	}
+}
+
+func (fv *funcVisitor) handleDefers() {
+	/*for i := len(fv.vr.defers) - 1; i >= 0; i-- {
+		di := fv.vr.defers[i]
+		if call := di.call; call != nil {
+			ast.Walk(fv, call)
+		} else {
+			println(len(di.branches))
+			changers := fv.sc.branchStart(len(di.branches))
+			for i, branch := range di.branches {
+				var result visitResult
+				fv := newFuncVisitor(changers[i], false)
+				for _, di := range branch {
+					result = fv.walk(node)
+				}
+				results = append(results, result)
+				di.branches = append(di.branches, result.defers)
+			}
+		}
+	}*/
+}
+
+func handleDefers(fv *funcVisitor, defers []deferItem) {
+	/*for i := len(defers) - 1; i >= 0; i-- {
+		di := defers[i]
+		if call := di.call; call != nil {
+			ast.Walk(fv, call)
+			continue
+		}
+		changers := fv.sc.branchStart(len(di.branches))
+		for i, branch := range di.branches {
+			fv := newFuncVisitor(changers[i], false)
+		}
+	}*/
 }
 
 type callVisitor struct {
