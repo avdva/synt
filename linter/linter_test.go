@@ -86,11 +86,11 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func9")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func9"]
+	func5Desc := sc.pkg.types["Type1"].methods["func5"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
@@ -296,7 +296,9 @@ func TestFunc13(t *testing.T) {
 
 func TestFunc14(t *testing.T) {
 	expected := []error{
-	//&invalidActError{subject: "", object: "t.m", action: 2, reason: "not locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
 	}
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func14")
 }

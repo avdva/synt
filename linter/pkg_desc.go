@@ -3,7 +3,6 @@
 package linter
 
 import (
-	"fmt"
 	"go/ast"
 	"strings"
 )
@@ -50,6 +49,11 @@ func (i id) selector() id {
 
 func (i *id) append(part string) {
 	i.parts = append(i.parts, part)
+}
+
+type varDesc struct {
+	altNames map[string]struct{}
+	genesis  id
 }
 
 type annotation struct {
@@ -163,22 +167,4 @@ func parseRecord(rec string) annotation {
 	}
 	result.obj = idFromParts(strings.Split(rec, ".")...)
 	return result
-}
-
-func debugPrintPkgDesc(desc *pkgDesc) {
-	for name, td := range desc.types {
-		fmt.Printf("type %s\n", name)
-		for name, f := range td.fields {
-			fmt.Printf("    field %s\n", name)
-			for _, a := range f.annotations {
-				fmt.Printf("      annot = %v\n", a)
-			}
-		}
-		for name, m := range td.methods {
-			fmt.Printf("    method %s\n", name)
-			for _, a := range m.annotations {
-				fmt.Printf("      annot = %v\n", a)
-			}
-		}
-	}
 }

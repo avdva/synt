@@ -50,6 +50,11 @@ func (t *Type1) getM() *sync.RWMutex {
 }
 
 func (t *Type1) func5() {
+	var v int
+	var (
+		v1 int
+	)
+	_, _ = v, v1
 	a := 0
 	{
 		a = 1
@@ -198,6 +203,9 @@ func (t *Type1) func14() {
 	} else if a == 1 {
 		defer t.m.RUnlock()
 	} else {
-
+		defer func() {
+			defer t.m.RUnlock()
+			t.m.RUnlock()
+		}()
 	}
 }

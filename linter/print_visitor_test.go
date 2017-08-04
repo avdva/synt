@@ -3,6 +3,7 @@
 package linter
 
 import (
+	"fmt"
 	"go/ast"
 	"io"
 	"reflect"
@@ -68,4 +69,22 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	}
 	return fv
+}
+
+func debugPrintPkgDesc(desc *pkgDesc) {
+	for name, td := range desc.types {
+		fmt.Printf("type %s\n", name)
+		for name, f := range td.fields {
+			fmt.Printf("    field %s\n", name)
+			for _, a := range f.annotations {
+				fmt.Printf("      annot = %v\n", a)
+			}
+		}
+		for name, m := range td.methods {
+			fmt.Printf("    method %s\n", name)
+			for _, a := range m.annotations {
+				fmt.Printf("      annot = %v\n", a)
+			}
+		}
+	}
 }

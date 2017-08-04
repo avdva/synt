@@ -52,7 +52,7 @@ func newFuncVisitor(sc stateChanger, root bool) *funcVisitor {
 func (fv *funcVisitor) walk(node ast.Node) visitResult {
 	ast.Walk(fv, node)
 	if fv.root {
-		fv.handleDefers()
+		handleDefers(fv, fv.vr.defers)
 	}
 	return fv.vr
 }
@@ -71,13 +71,24 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
 	case *ast.DeferStmt:
+		for _, arg := range typed.Call.Args {
+			ast.Walk(fv, arg)
+		}
 		fv.vr.defers = append(fv.vr.defers, deferItem{call: typed.Call})
 		return nil
 	case *ast.CallExpr:
 		fv.handleCall(typed)
 		return nil
 	case *ast.ReturnStmt:
+		for _, res := range typed.Results {
+			ast.Walk(fv, res)
+		}
 		fv.vr.exitType = exitReturn
+		return nil
+	case *ast.AssignStmt:
+		if typed.Tok == token.DEFINE {
+			//typed.Lhs
+		}
 		return nil
 	}
 	return fv
@@ -118,39 +129,23 @@ func (fv *funcVisitor) handleCall(expr *ast.CallExpr) {
 	}
 }
 
-func (fv *funcVisitor) handleDefers() {
-	/*for i := len(fv.vr.defers) - 1; i >= 0; i-- {
-		di := fv.vr.defers[i]
-		if call := di.call; call != nil {
-			ast.Walk(fv, call)
-		} else {
-			println(len(di.branches))
-			changers := fv.sc.branchStart(len(di.branches))
-			for i, branch := range di.branches {
-				var result visitResult
-				fv := newFuncVisitor(changers[i], false)
-				for _, di := range branch {
-					result = fv.walk(node)
-				}
-				results = append(results, result)
-				di.branches = append(di.branches, result.defers)
-			}
-		}
-	}*/
-}
-
 func handleDefers(fv *funcVisitor, defers []deferItem) {
-	/*for i := len(defers) - 1; i >= 0; i-- {
+	for i := len(defers) - 1; i >= 0; i-- {
 		di := defers[i]
 		if call := di.call; call != nil {
 			ast.Walk(fv, call)
 			continue
 		}
+		var results []visitResult
 		changers := fv.sc.branchStart(len(di.branches))
 		for i, branch := range di.branches {
 			fv := newFuncVisitor(changers[i], false)
+			handleDefers(fv, branch)
+			_, _ = branch, fv
+			results = append(results, visitResult{exitType: exitNormal})
 		}
-	}*/
+		fv.sc.branchEnd(results)
+	}
 }
 
 type callVisitor struct {
