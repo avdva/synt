@@ -216,6 +216,7 @@ type syntChecker struct {
 	branches  []stateChanger
 	st        *syntState
 	currentMD *methodDesc
+	stack     []scope
 	reports   []Report
 }
 

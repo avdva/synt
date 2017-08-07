@@ -51,9 +51,17 @@ func (i *id) append(part string) {
 	i.parts = append(i.parts, part)
 }
 
-type varDesc struct {
-	altNames map[string]struct{}
-	genesis  id
+type object struct {
+	id   string
+	refs []*variable
+}
+
+type variable struct {
+	o *object
+}
+
+type scope struct {
+	vars map[string]*variable
 }
 
 type annotation struct {
