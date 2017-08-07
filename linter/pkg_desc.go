@@ -64,6 +64,10 @@ type scope struct {
 	vars map[string]*variable
 }
 
+func newScope() scope {
+	return scope{vars: make(map[string]*variable)}
+}
+
 type annotation struct {
 	obj id
 	not bool

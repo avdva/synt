@@ -210,43 +210,62 @@ func (ss *syntState) ensureState(name string, state mutexState) *invalidStateErr
 }
 
 type syntChecker struct {
-	pkg       *pkgDesc
-	typ       string
-	fun       string
-	branches  []stateChanger
-	st        *syntState
-	currentMD *methodDesc
-	stack     []scope
-	reports   []Report
+	pkg      *pkgDesc
+	typ      string
+	fun      string
+	branches []stateChanger
+	st       *syntState
+	method   *methodDesc
+	stack    []scope
+	objects  map[string]*object
+	reports  []Report
 }
 
 func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	result := &syntChecker{
-		pkg: pkg,
-		typ: typ,
-		fun: fun,
-		st:  newSyntState(),
+		pkg:     pkg,
+		typ:     typ,
+		fun:     fun,
+		objects: make(map[string]*object),
+		st:      newSyntState(),
 	}
-	if len(result.typ) > 0 {
-		if typDesc, found := result.pkg.types[result.typ]; found {
-			if md, found := typDesc.methods[result.fun]; found {
-				result.currentMD = &md
+	result.assignMethod()
+	result.buildObjects()
+	return result
+}
+
+func (sc *syntChecker) assignMethod() {
+	if len(sc.typ) > 0 {
+		if typDesc, found := sc.pkg.types[sc.typ]; found {
+			if md, found := typDesc.methods[sc.fun]; found {
+				sc.method = &md
 			}
 		}
-	} else {
-		/*if md, found := result.pkg. [result.fun]; found {
-			result =  &md
-		}*/
+	} else { // TODO(avd) - functions
 	}
-	if result.currentMD == nil {
+	if sc.method == nil {
 		panic("unknown context")
 	}
-	return result
+}
+
+func (sc *syntChecker) buildObjects() {
+	if sc.method.obj.len() > 0 {
+		recvName := sc.method.obj.String()
+		o := &object{id: recvName}
+		v := &variable{o: o}
+		o.refs = append(o.refs, v)
+		funcScope := newScope()
+		funcScope.vars[recvName] = v
+		sc.stack = []scope{
+			newScope(), // TODO(avd) - global scope
+			funcScope,
+		}
+	}
 }
 
 func (sc *syntChecker) check() []Report {
 	fv := newFuncVisitor(sc, true)
-	fv.walk(sc.currentMD.node)
+	fv.walk(sc.method.node)
 	return sc.reports
 }
 
@@ -255,8 +274,8 @@ func (sc *syntChecker) onNewContext(node ast.Node) {
 		pkg: sc.pkg,
 		typ: sc.typ,
 		st:  newSyntState(),
-		currentMD: &methodDesc{
-			obj: sc.currentMD.obj,
+		method: &methodDesc{
+			obj: sc.method.obj,
 		},
 	}
 	ast.Walk(&funcVisitor{sc: newSc}, node)
@@ -266,10 +285,10 @@ func (sc *syntChecker) onNewContext(node ast.Node) {
 func (sc *syntChecker) branchStart(count int) []stateChanger {
 	for i := 0; i < count; i++ {
 		newSc := &syntChecker{
-			pkg:       sc.pkg,
-			typ:       sc.typ,
-			st:        copyState(sc.st),
-			currentMD: sc.currentMD,
+			pkg:    sc.pkg,
+			typ:    sc.typ,
+			st:     copyState(sc.st),
+			method: sc.method,
 		}
 		sc.branches = append(sc.branches, newSc)
 	}
@@ -308,7 +327,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 	case "Lock":
 		if !sc.canLock(obj) {
 			result = append(result, &invalidActError{
-				subject: sc.currentMD.obj.name().String(),
+				subject: sc.method.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActLock,
 				reason:  "annotation"},
@@ -320,7 +339,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 	case "RLock":
 		if !sc.canLock(obj) {
 			result = append(result, &invalidActError{
-				subject: sc.currentMD.obj.name().String(),
+				subject: sc.method.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActRLock,
 				reason:  "annotation"},
@@ -345,7 +364,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 
 func (sc *syntChecker) checkExec(obj id) []error {
 	sel := obj.selector()
-	if !sel.eq(sc.currentMD.obj.selector()) {
+	if !sel.eq(sc.method.obj.selector()) {
 		return nil
 	}
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
@@ -383,7 +402,7 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 	if caleeName != "Lock" && caleeName != "RLock" {
 		return
 	}
-	for _, aCaller := range sc.currentMD.annotations {
+	for _, aCaller := range sc.method.annotations {
 		callerName := aCaller.obj.name().String()
 		if callerName != "Lock" && callerName != "RLock" {
 			continue
@@ -406,7 +425,7 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 }
 
 func (sc *syntChecker) canLock(obj id) bool {
-	for _, a := range sc.currentMD.annotations {
+	for _, a := range sc.method.annotations {
 		if a.obj.selector().eq(obj.selector()) && !a.not {
 			return false
 		}
