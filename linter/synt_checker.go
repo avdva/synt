@@ -321,7 +321,7 @@ func (sc *syntChecker) newObject(name string, init id) {
 	o := &object{id: name}
 	v := &variable{o: o}
 	o.refs = append(o.refs, v)
-	_ = current
+	current.vars[name] = v
 }
 
 func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
