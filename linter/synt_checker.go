@@ -217,17 +217,15 @@ type syntChecker struct {
 	state    *syntState
 	method   *methodDesc
 	stack    []scope
-	objects  map[string]*object
 	reports  []Report
 }
 
 func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	result := &syntChecker{
-		pkg:     pkg,
-		typ:     typ,
-		fun:     fun,
-		objects: make(map[string]*object),
-		state:   newSyntState(),
+		pkg:   pkg,
+		typ:   typ,
+		fun:   fun,
+		state: newSyntState(),
 	}
 	result.assignMethod()
 	result.buildObjects()
@@ -273,8 +271,7 @@ func (sc *syntChecker) newContext(node ast.Node) {
 		method: &methodDesc{
 			obj: sc.method.obj,
 		},
-		stack:   newStack(sc.stack),
-		objects: newObjects(sc.objects),
+		stack: newStack(sc.stack),
 	}
 	fv := newFuncVisitor(newSc, true)
 	fv.walk(node)
@@ -284,12 +281,11 @@ func (sc *syntChecker) newContext(node ast.Node) {
 func (sc *syntChecker) branchStart(count int) []stateChanger {
 	for i := 0; i < count; i++ {
 		newSc := &syntChecker{
-			pkg:     sc.pkg,
-			typ:     sc.typ,
-			state:   copyState(sc.state),
-			stack:   newStack(sc.stack),
-			objects: newObjects(sc.objects),
-			method:  sc.method,
+			pkg:    sc.pkg,
+			typ:    sc.typ,
+			state:  copyState(sc.state),
+			stack:  newStack(sc.stack),
+			method: sc.method,
 		}
 		sc.branches = append(sc.branches, newSc)
 	}
@@ -311,17 +307,18 @@ func (sc *syntChecker) branchEnd(results []visitResult) {
 	sc.branches = nil
 }
 
-func (sc *syntChecker) newScope() {
+func (sc *syntChecker) scopeStart() {
 	sc.stack = newStack(sc.stack)
 }
 
+func (sc *syntChecker) scopeEnd() {
+	sc.stack = sc.stack[:len(sc.stack)-1]
+}
+
 func (sc *syntChecker) newObject(name string, init id) {
+	println(name)
 	current := sc.stack[len(sc.stack)-1]
-	//variable, found := current.vars[name]
-	o := &object{id: name}
-	v := &variable{o: o}
-	o.refs = append(o.refs, v)
-	current.vars[name] = v
+	current.addVar(name, name)
 }
 
 func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
@@ -481,6 +478,48 @@ func copyState(st *syntState) *syntState {
 	return result
 }
 
+type object struct {
+	id   string
+	refs []*variable
+}
+
+type variable struct {
+	o *object
+}
+
+type scope struct {
+	vars    map[string]*variable
+	objects map[string]*object
+}
+
+func (s *scope) addVar(objId, varName string) {
+	o := &object{id: objId}
+	v := &variable{o: o}
+	o.refs = append(o.refs, v)
+	s.vars[varName] = v
+	s.objects[objId] = o
+}
+
+func newScope() scope {
+	return scope{
+		vars:    make(map[string]*variable),
+		objects: make(map[string]*object),
+	}
+}
+
+func copyScope(sc scope) scope {
+	result := newScope()
+	for k, v := range sc.vars {
+		variable := *v
+		result.vars[k] = &variable
+	}
+	for k, v := range sc.objects {
+		obj := *v
+		result.objects[k] = &obj
+	}
+	return result
+}
+
 func newStack(stack []scope) []scope {
 	var result []scope
 	for _, s := range stack {
@@ -488,15 +527,6 @@ func newStack(stack []scope) []scope {
 	}
 	if l := len(result); l > 0 {
 		result = append(result, copyScope(result[l-1]))
-	}
-	return result
-}
-
-func newObjects(old map[string]*object) map[string]*object {
-	result := make(map[string]*object)
-	for k, v := range old {
-		o := *v
-		result[k] = &o
 	}
 	return result
 }

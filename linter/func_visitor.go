@@ -21,10 +21,11 @@ const (
 type stateChanger interface {
 	newContext(node ast.Node)
 	newObject(obj string, init id)
-	newScope()
-	expr(op int, obj id, pos token.Pos)
+	scopeStart()
+	scopeEnd()
 	branchStart(count int) []stateChanger
 	branchEnd([]visitResult)
+	expr(op int, obj id, pos token.Pos)
 }
 
 type deferItem struct {
@@ -89,7 +90,11 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.AssignStmt:
 		if typed.Tok == token.DEFINE {
-			//typed.Lhs
+			for _, lhs := range typed.Lhs {
+				if ident, ok := lhs.(*ast.Ident); ok {
+					fv.sc.newObject(ident.Name, id{})
+				}
+			}
 		}
 		//return nil
 	}

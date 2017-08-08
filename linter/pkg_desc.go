@@ -51,32 +51,6 @@ func (i *id) append(part string) {
 	i.parts = append(i.parts, part)
 }
 
-type object struct {
-	id   string
-	refs []*variable
-}
-
-type variable struct {
-	o *object
-}
-
-type scope struct {
-	vars map[string]*variable
-}
-
-func newScope() scope {
-	return scope{vars: make(map[string]*variable)}
-}
-
-func copyScope(sc scope) scope {
-	result := newScope()
-	for k, v := range sc.vars {
-		variable := *v
-		result.vars[k] = &variable
-	}
-	return result
-}
-
 type annotation struct {
 	obj id
 	not bool
