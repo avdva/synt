@@ -68,6 +68,15 @@ func newScope() scope {
 	return scope{vars: make(map[string]*variable)}
 }
 
+func copyScope(sc scope) scope {
+	result := newScope()
+	for k, v := range sc.vars {
+		variable := *v
+		result.vars[k] = &variable
+	}
+	return result
+}
+
 type annotation struct {
 	obj id
 	not bool

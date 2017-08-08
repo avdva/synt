@@ -62,6 +62,10 @@ func TestLinterParseComments(t *testing.T) {
 					"func8":   methodDesc{},
 					"func10":  methodDesc{},
 					"func11":  methodDesc{},
+					"func12":  methodDesc{},
+					"func13":  methodDesc{},
+					"func14":  methodDesc{},
+					"func15":  methodDesc{},
 					"getM":    methodDesc{},
 					"self":    methodDesc{},
 				},
@@ -86,11 +90,11 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func7")
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func5"]
+	func5Desc := sc.pkg.types["Type1"].methods["func7"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
@@ -301,6 +305,16 @@ func TestFunc14(t *testing.T) {
 		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
 	}
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func14")
+}
+
+func TestFunc15(t *testing.T) {
+	expected := []error{
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+		&invalidActError{subject: "", object: "t.m", action: 3, reason: "locked"},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func15")
 }
 
 func TestCandle(t *testing.T) {

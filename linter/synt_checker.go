@@ -214,7 +214,7 @@ type syntChecker struct {
 	typ      string
 	fun      string
 	branches []stateChanger
-	st       *syntState
+	state    *syntState
 	method   *methodDesc
 	stack    []scope
 	objects  map[string]*object
@@ -227,7 +227,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		typ:     typ,
 		fun:     fun,
 		objects: make(map[string]*object),
-		st:      newSyntState(),
+		state:   newSyntState(),
 	}
 	result.assignMethod()
 	result.buildObjects()
@@ -235,7 +235,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 }
 
 func (sc *syntChecker) assignMethod() {
-	if len(sc.typ) > 0 {
+	if len(sc.typ) > 0 { // methods
 		if typDesc, found := sc.pkg.types[sc.typ]; found {
 			if md, found := typDesc.methods[sc.fun]; found {
 				sc.method = &md
@@ -254,12 +254,8 @@ func (sc *syntChecker) buildObjects() {
 		o := &object{id: recvName}
 		v := &variable{o: o}
 		o.refs = append(o.refs, v)
-		funcScope := newScope()
-		funcScope.vars[recvName] = v
-		sc.stack = []scope{
-			newScope(), // TODO(avd) - global scope
-			funcScope,
-		}
+		sc.stack = newStack([]scope{newScope()}) // TODO(avd) - global scope instead of a new one.
+		sc.stack[len(sc.stack)-1].vars[recvName] = v
 	}
 }
 
@@ -269,26 +265,31 @@ func (sc *syntChecker) check() []Report {
 	return sc.reports
 }
 
-func (sc *syntChecker) onNewContext(node ast.Node) {
+func (sc *syntChecker) newContext(node ast.Node) {
 	newSc := &syntChecker{
-		pkg: sc.pkg,
-		typ: sc.typ,
-		st:  newSyntState(),
+		pkg:   sc.pkg,
+		typ:   sc.typ,
+		state: newSyntState(),
 		method: &methodDesc{
 			obj: sc.method.obj,
 		},
+		stack:   newStack(sc.stack),
+		objects: newObjects(sc.objects),
 	}
-	ast.Walk(&funcVisitor{sc: newSc}, node)
+	fv := newFuncVisitor(newSc, true)
+	fv.walk(node)
 	sc.reports = append(sc.reports, newSc.reports...)
 }
 
 func (sc *syntChecker) branchStart(count int) []stateChanger {
 	for i := 0; i < count; i++ {
 		newSc := &syntChecker{
-			pkg:    sc.pkg,
-			typ:    sc.typ,
-			st:     copyState(sc.st),
-			method: sc.method,
+			pkg:     sc.pkg,
+			typ:     sc.typ,
+			state:   copyState(sc.state),
+			stack:   newStack(sc.stack),
+			objects: newObjects(sc.objects),
+			method:  sc.method,
 		}
 		sc.branches = append(sc.branches, newSc)
 	}
@@ -301,16 +302,29 @@ func (sc *syntChecker) branchEnd(results []visitResult) {
 		bsc := sc.branches[i].(*syntChecker)
 		sc.reports = append(sc.reports, bsc.reports...)
 		if result.exitType == exitNormal {
-			states = append(states, bsc.st)
+			states = append(states, bsc.state)
 		}
 	}
 	if len(states) > 0 {
-		sc.st = mergeStates(states)
+		sc.state = mergeStates(states)
 	}
 	sc.branches = nil
 }
 
-func (sc *syntChecker) onExpr(op int, obj id, pos token.Pos) {
+func (sc *syntChecker) newScope() {
+	sc.stack = newStack(sc.stack)
+}
+
+func (sc *syntChecker) newObject(name string, init id) {
+	current := sc.stack[len(sc.stack)-1]
+	//variable, found := current.vars[name]
+	o := &object{id: name}
+	v := &variable{o: o}
+	o.refs = append(o.refs, v)
+	_ = current
+}
+
+func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
 	switch op {
 	case exprExec:
 		errors := sc.onExec(obj)
@@ -330,10 +344,10 @@ func (sc *syntChecker) onExec(obj id) []error {
 				subject: sc.method.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActLock,
-				reason:  "annotation"},
-			)
+				reason:  "annotation",
+			})
 		}
-		if err := sc.st.stateChange(sel.String(), mutActLock); err != nil {
+		if err := sc.state.stateChange(sel.String(), mutActLock); err != nil {
 			result = append(result, err)
 		}
 	case "RLock":
@@ -342,18 +356,18 @@ func (sc *syntChecker) onExec(obj id) []error {
 				subject: sc.method.obj.name().String(),
 				object:  sel.String(),
 				action:  mutActRLock,
-				reason:  "annotation"},
-			)
+				reason:  "annotation",
+			})
 		}
-		if err := sc.st.stateChange(sel.String(), mutActRLock); err != nil {
+		if err := sc.state.stateChange(sel.String(), mutActRLock); err != nil {
 			result = append(result, err)
 		}
 	case "Unlock":
-		if err := sc.st.stateChange(sel.String(), mutActUnlock); err != nil {
+		if err := sc.state.stateChange(sel.String(), mutActUnlock); err != nil {
 			result = append(result, err)
 		}
 	case "RUnlock":
-		if err := sc.st.stateChange(sel.String(), mutActRUnlock); err != nil {
+		if err := sc.state.stateChange(sel.String(), mutActRUnlock); err != nil {
 			result = append(result, err)
 		}
 	default:
@@ -388,7 +402,7 @@ func (sc *syntChecker) checkExec(obj id) []error {
 		if gotLock, err := sc.checkCallerAnnotation(a); err != nil {
 			result = append(result, err)
 		} else if !gotLock {
-			if err := sc.st.ensureState(a.obj.selector().String(), state); err != nil {
+			if err := sc.state.ensureState(a.obj.selector().String(), state); err != nil {
 				err.reason = "in call to " + callee.obj.name().String()
 				result = append(result, err)
 			}
@@ -463,6 +477,26 @@ func copyState(st *syntState) *syntState {
 	result := newSyntState()
 	for k, v := range st.mut {
 		result.mut[k] = v
+	}
+	return result
+}
+
+func newStack(stack []scope) []scope {
+	var result []scope
+	for _, s := range stack {
+		result = append(result, copyScope(s))
+	}
+	if l := len(result); l > 0 {
+		result = append(result, copyScope(result[l-1]))
+	}
+	return result
+}
+
+func newObjects(old map[string]*object) map[string]*object {
+	result := make(map[string]*object)
+	for k, v := range old {
+		o := *v
+		result[k] = &o
 	}
 	return result
 }

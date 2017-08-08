@@ -209,3 +209,30 @@ func (t *Type1) func14() {
 		}()
 	}
 }
+
+type f3 struct{}
+
+func (f f3) func3() {
+
+}
+
+func (f f3) func3_2() {
+
+}
+
+func (t *Type1) func15() {
+	{
+		var t f3
+		t.func3()
+	}
+	for t := range (chan f3)(nil) {
+		t.func3_2()
+	}
+	if t := new(f3); t != nil {
+		t.func3_2()
+	}
+	{
+		t := f3{}
+		t.func3()
+	}
+}

@@ -19,8 +19,10 @@ const (
 )
 
 type stateChanger interface {
-	onExpr(op int, obj id, pos token.Pos)
-	onNewContext(node ast.Node)
+	newContext(node ast.Node)
+	newObject(obj string, init id)
+	newScope()
+	expr(op int, obj id, pos token.Pos)
 	branchStart(count int) []stateChanger
 	branchEnd([]visitResult)
 }
@@ -63,7 +65,7 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	}
 	switch typed := node.(type) {
 	case *ast.GoStmt:
-		fv.sc.onNewContext(typed.Call)
+		fv.sc.newContext(typed.Call)
 		return nil
 	case *ast.IfStmt:
 		fv.handleIf(typed)
@@ -89,7 +91,7 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		if typed.Tok == token.DEFINE {
 			//typed.Lhs
 		}
-		return nil
+		//return nil
 	}
 	return fv
 }
@@ -125,7 +127,7 @@ func (fv *funcVisitor) handleCall(expr *ast.CallExpr) {
 		if cid.String() == "panic" {
 			fv.vr.exitType = exitPanic
 		}
-		fv.sc.onExpr(exprExec, cid, cv.callPosAt(cid.len()-1))
+		fv.sc.expr(exprExec, cid, cv.callPosAt(cid.len()-1))
 	}
 }
 
@@ -214,7 +216,7 @@ func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(sm, arg)
 		}
 		if expanded := expandCall(typed.Fun); expanded != nil {
-			sm.sc.onExpr(exprExec, idFromParts(expanded...), typed.Pos())
+			sm.sc.expr(exprExec, idFromParts(expanded...), typed.Pos())
 		}
 	case *ast.AssignStmt:
 	case *ast.IncDecStmt:
