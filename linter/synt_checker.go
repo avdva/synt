@@ -249,11 +249,8 @@ func (sc *syntChecker) assignMethod() {
 func (sc *syntChecker) buildObjects() {
 	if sc.method.obj.len() > 0 {
 		recvName := sc.method.obj.String()
-		o := &object{id: recvName}
-		v := &variable{o: o}
-		o.refs = append(o.refs, v)
 		sc.stack = newStack([]scope{newScope()}) // TODO(avd) - global scope instead of a new one.
-		sc.stack[len(sc.stack)-1].vars[recvName] = v
+		sc.stack[len(sc.stack)-1].addVar(recvName, recvName)
 	}
 }
 
