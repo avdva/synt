@@ -234,5 +234,9 @@ func (t *Type1) func15() {
 	{
 		t := f3{}
 		t.func3()
+		{
+			t := f3{}
+			t.func3()
+		}
 	}
 }

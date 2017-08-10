@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -216,7 +217,7 @@ type syntChecker struct {
 	branches []stateChanger
 	state    *syntState
 	method   *methodDesc
-	stack    []scope
+	stk      *stack
 	reports  []Report
 }
 
@@ -225,6 +226,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		pkg:   pkg,
 		typ:   typ,
 		fun:   fun,
+		stk:   newStack(),
 		state: newSyntState(),
 	}
 	result.assignMethod()
@@ -249,8 +251,9 @@ func (sc *syntChecker) assignMethod() {
 func (sc *syntChecker) buildObjects() {
 	if sc.method.obj.len() > 0 {
 		recvName := sc.method.obj.String()
-		sc.stack = newStack([]scope{newScope()}) // TODO(avd) - global scope instead of a new one.
-		sc.stack[len(sc.stack)-1].addVar(recvName, recvName)
+		sc.stk.push() // TODO(avd) - global scope instead of a new one.
+		sc.stk.push()
+		sc.stk.addVar(recvName)
 	}
 }
 
@@ -268,7 +271,7 @@ func (sc *syntChecker) newContext(node ast.Node) {
 		method: &methodDesc{
 			obj: sc.method.obj,
 		},
-		stack: newStack(sc.stack),
+		stk: copyStack(*sc.stk),
 	}
 	fv := newFuncVisitor(newSc, true)
 	fv.walk(node)
@@ -281,7 +284,7 @@ func (sc *syntChecker) branchStart(count int) []stateChanger {
 			pkg:    sc.pkg,
 			typ:    sc.typ,
 			state:  copyState(sc.state),
-			stack:  newStack(sc.stack),
+			stk:    copyStack(*sc.stk),
 			method: sc.method,
 		}
 		sc.branches = append(sc.branches, newSc)
@@ -305,17 +308,16 @@ func (sc *syntChecker) branchEnd(results []visitResult) {
 }
 
 func (sc *syntChecker) scopeStart() {
-	sc.stack = newStack(sc.stack)
+	sc.stk.push()
 }
 
 func (sc *syntChecker) scopeEnd() {
-	sc.stack = sc.stack[:len(sc.stack)-1]
+	sc.stk.pop()
 }
 
 func (sc *syntChecker) newObject(name string, init id) {
 	println(name)
-	current := sc.stack[len(sc.stack)-1]
-	current.addVar(name, name)
+	sc.stk.addVar(name)
 }
 
 func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
@@ -476,54 +478,72 @@ func copyState(st *syntState) *syntState {
 }
 
 type object struct {
-	id   string
-	refs []*variable
+	id string
 }
 
 type variable struct {
-	o *object
+	name     string
+	objectID string
 }
 
 type scope struct {
-	vars    map[string]*variable
-	objects map[string]*object
-}
-
-func (s *scope) addVar(objId, varName string) {
-	o := &object{id: objId}
-	v := &variable{o: o}
-	o.refs = append(o.refs, v)
-	s.vars[varName] = v
-	s.objects[objId] = o
+	vars map[string]variable
 }
 
 func newScope() scope {
 	return scope{
-		vars:    make(map[string]*variable),
-		objects: make(map[string]*object),
+		vars: make(map[string]variable),
 	}
+}
+
+type stack struct {
+	id      int
+	objects map[string]object
+	scopes  []scope
+}
+
+func newStack() *stack {
+	return &stack{
+		objects: make(map[string]object),
+	}
+}
+
+func (stk *stack) push() {
+	println("push")
+	stk.scopes = append(stk.scopes, newScope())
+}
+
+func (stk *stack) pop() {
+	println("pop")
+	stk.scopes = stk.scopes[:len(stk.scopes)-1]
+}
+
+func (stk *stack) lastScope() *scope {
+	return &stk.scopes[len(stk.scopes)-1]
+}
+
+func (stk *stack) addVar(varName string) {
+	id := strconv.Itoa(stk.id)
+	stk.id++
+	stk.objects[id] = object{id: id}
+	stk.lastScope().vars[varName] = variable{name: varName, objectID: id}
 }
 
 func copyScope(sc scope) scope {
 	result := newScope()
 	for k, v := range sc.vars {
-		variable := *v
-		result.vars[k] = &variable
-	}
-	for k, v := range sc.objects {
-		obj := *v
-		result.objects[k] = &obj
+		result.vars[k] = v
 	}
 	return result
 }
 
-func newStack(stack []scope) []scope {
-	var result []scope
-	for _, s := range stack {
-		result = append(result, copyScope(s))
+func copyStack(stk stack) *stack {
+	result := newStack()
+	for k, v := range stk.objects {
+		result.objects[k] = v
 	}
-	if l := len(result); l > 0 {
-		result = append(result, copyScope(result[l-1]))
+	for _, sc := range stk.scopes {
+		stk.scopes = append(stk.scopes, copyScope(sc))
 	}
 	return result
 }

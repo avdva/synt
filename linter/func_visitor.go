@@ -104,6 +104,7 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
 	var di deferItem
 	var results []visitResult
+	fv.sc.scopeStart()
 	if stmt.Init != nil {
 		ast.Walk(fv, stmt.Init)
 	}
@@ -122,6 +123,7 @@ func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
 		di.branches = append(di.branches, result.defers)
 	}
 	fv.sc.branchEnd(results)
+	fv.sc.scopeEnd()
 	fv.vr.defers = append(fv.vr.defers, di)
 }
 
