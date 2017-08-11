@@ -104,13 +104,6 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
 	var di deferItem
 	var results []visitResult
-	fv.sc.scopeStart()
-	if stmt.Init != nil {
-		ast.Walk(fv, stmt.Init)
-	}
-	if stmt.Cond != nil {
-		ast.Walk(fv, stmt.Cond)
-	}
 	branches := expandIf(stmt)
 	changers := fv.sc.branchStart(len(branches))
 	for i, branch := range branches {
@@ -123,7 +116,6 @@ func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
 		di.branches = append(di.branches, result.defers)
 	}
 	fv.sc.branchEnd(results)
-	fv.sc.scopeEnd()
 	fv.vr.defers = append(fv.vr.defers, di)
 }
 
@@ -257,10 +249,18 @@ func expandCall(node ast.Node) []string {
 }
 
 func expandIf(node *ast.IfStmt) [][]ast.Node {
-	result := [][]ast.Node{[]ast.Node{node.Body}}
+	var arr []ast.Node
+	if node.Init != nil {
+		arr = append(arr, node.Init)
+	}
+	if node.Cond != nil {
+		arr = append(arr, node.Cond)
+	}
+	arr = append(arr, node.Body)
+	result := [][]ast.Node{arr}
 	for elseNode := node.Else; elseNode != nil; {
 		if ifStmt, ok := elseNode.(*ast.IfStmt); ok {
-			var arr []ast.Node
+			arr = nil
 			if ifStmt.Init != nil {
 				arr = append(arr, ifStmt.Init)
 			}

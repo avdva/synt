@@ -287,6 +287,7 @@ func (sc *syntChecker) branchStart(count int) []stateChanger {
 			stk:    copyStack(*sc.stk),
 			method: sc.method,
 		}
+		newSc.stk.push()
 		sc.branches = append(sc.branches, newSc)
 	}
 	return sc.branches
