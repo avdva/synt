@@ -228,6 +228,10 @@ func (t *Type1) func15() {
 	for t := range (chan f3)(nil) {
 		t.func3_2()
 	}
+	for i := 0; i < 3; i++ {
+		var t f3
+		t.func3()
+	}
 	if t := new(f3); t != nil {
 		t.func3_2()
 	}

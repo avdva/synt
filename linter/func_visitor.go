@@ -71,6 +71,20 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.IfStmt:
 		fv.handleIf(typed)
 		return nil
+	case *ast.ForStmt:
+		fv.sc.scopeStart()
+		if typed.Init != nil {
+			ast.Walk(fv, typed.Init)
+		}
+		if typed.Cond != nil {
+			ast.Walk(fv, typed.Cond)
+		}
+		if typed.Post != nil {
+			ast.Walk(fv, typed.Post)
+		}
+		ast.Walk(fv, typed.Body)
+		fv.sc.scopeEnd()
+		return nil
 	case *ast.SwitchStmt, *ast.SelectStmt, *ast.TypeSwitchStmt:
 		return nil
 	case *ast.DeferStmt:
@@ -142,7 +156,6 @@ func handleDefers(fv *funcVisitor, defers []deferItem) {
 		for i, branch := range di.branches {
 			fv := newFuncVisitor(changers[i], false)
 			handleDefers(fv, branch)
-			_, _ = branch, fv
 			results = append(results, visitResult{exitType: exitNormal})
 		}
 		fv.sc.branchEnd(results)
