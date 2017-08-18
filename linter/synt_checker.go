@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -251,7 +250,6 @@ func (sc *syntChecker) assignMethod() {
 func (sc *syntChecker) buildObjects() {
 	if sc.method.obj.len() > 0 {
 		recvName := sc.method.obj.String()
-		sc.stk.push() // TODO(avd) - global scope instead of a new one.
 		sc.stk.push()
 		sc.stk.addVar(recvName)
 	}
@@ -474,77 +472,6 @@ func copyState(st *syntState) *syntState {
 	result := newSyntState()
 	for k, v := range st.mut {
 		result.mut[k] = v
-	}
-	return result
-}
-
-type object struct {
-	id string
-}
-
-type variable struct {
-	name     string
-	objectID string
-}
-
-type scope struct {
-	vars map[string]variable
-}
-
-func newScope() scope {
-	return scope{
-		vars: make(map[string]variable),
-	}
-}
-
-type stack struct {
-	id      int
-	objects map[string]object
-	scopes  []scope
-}
-
-func newStack() *stack {
-	return &stack{
-		objects: make(map[string]object),
-	}
-}
-
-func (stk *stack) push() {
-	println("push")
-	stk.scopes = append(stk.scopes, newScope())
-}
-
-func (stk *stack) pop() {
-	println("pop")
-	stk.scopes = stk.scopes[:len(stk.scopes)-1]
-}
-
-func (stk *stack) lastScope() *scope {
-	return &stk.scopes[len(stk.scopes)-1]
-}
-
-func (stk *stack) addVar(varName string) {
-	id := strconv.Itoa(stk.id)
-	stk.id++
-	stk.objects[id] = object{id: id}
-	stk.lastScope().vars[varName] = variable{name: varName, objectID: id}
-}
-
-func copyScope(sc scope) scope {
-	result := newScope()
-	for k, v := range sc.vars {
-		result.vars[k] = v
-	}
-	return result
-}
-
-func copyStack(stk stack) *stack {
-	result := newStack()
-	for k, v := range stk.objects {
-		result.objects[k] = v
-	}
-	for _, sc := range stk.scopes {
-		stk.scopes = append(stk.scopes, copyScope(sc))
 	}
 	return result
 }
