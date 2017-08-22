@@ -39,12 +39,16 @@ func (i id) eq(other id) bool {
 	return true
 }
 
-func (i *id) name() id {
+func (i *id) last() id {
 	return id{parts: []string{i.parts[len(i.parts)-1]}}
 }
 
 func (i id) selector() id {
 	return id{parts: i.parts[:len(i.parts)-1]}
+}
+
+func (i id) first() id {
+	return id{parts: []string{i.parts[0]}}
 }
 
 func (i *id) append(part string) {
@@ -58,7 +62,7 @@ type annotation struct {
 
 type methodDesc struct {
 	node        ast.Node
-	obj         id
+	id          id
 	annotations []annotation
 }
 
@@ -74,8 +78,8 @@ type typeDesc struct {
 }
 
 type pkgDesc struct {
-	types   map[string]*typeDesc
-	globals map[string]ast.Node
+	types       map[string]*typeDesc
+	globalFuncs map[string]*methodDesc
 }
 
 func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
@@ -95,7 +99,7 @@ func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
 	td := d.descForType(typName)
 	td.methods[node.Name.Name] = methodDesc{
 		node:        node,
-		obj:         idFromParts(recv.Names[0].Name, node.Name.Name),
+		id:          idFromParts(recv.Names[0].Name, node.Name.Name),
 		annotations: annotations,
 	}
 }

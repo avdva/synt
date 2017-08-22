@@ -248,10 +248,11 @@ func (sc *syntChecker) assignMethod() {
 }
 
 func (sc *syntChecker) buildObjects() {
-	if sc.method.obj.len() > 0 {
-		recvName := sc.method.obj.String()
+	if sc.method.id.len() > 0 {
+		recvName := sc.method.id.String()
+		panic(sc.method.id.String())
 		sc.stk.push()
-		sc.stk.addVar(recvName)
+		sc.stk.addObject(idFromParts(recvName))
 	}
 }
 
@@ -267,7 +268,7 @@ func (sc *syntChecker) newContext(node ast.Node) {
 		typ:   sc.typ,
 		state: newSyntState(),
 		method: &methodDesc{
-			obj: sc.method.obj,
+			id: sc.method.id,
 		},
 		stk: copyStack(*sc.stk),
 	}
@@ -315,8 +316,19 @@ func (sc *syntChecker) scopeEnd() {
 }
 
 func (sc *syntChecker) newObject(name string, init id) {
-	println(name)
-	sc.stk.addVar(name)
+	sc.stk.addObject(idFromParts(name))
+
+	for id, obj := range sc.stk.objects {
+		println("obj = ", id, "  vars: ")
+		print("  ")
+		for v, k := range obj.vars {
+			println("    ", v, " obj: ", k.objectID)
+		}
+	}
+	for id, v := range sc.stk.lastScope().vars {
+		println("var ", id, "  of ", v.objectID)
+	}
+	println("----------------")
 }
 
 func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
@@ -332,11 +344,11 @@ func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
 func (sc *syntChecker) onExec(obj id) []error {
 	var result []error
 	sel := obj.selector()
-	switch obj.name().String() {
+	switch obj.last().String() {
 	case "Lock":
 		if !sc.canLock(obj) {
 			result = append(result, &invalidActError{
-				subject: sc.method.obj.name().String(),
+				subject: sc.method.id.last().String(),
 				object:  sel.String(),
 				action:  mutActLock,
 				reason:  "annotation",
@@ -348,7 +360,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 	case "RLock":
 		if !sc.canLock(obj) {
 			result = append(result, &invalidActError{
-				subject: sc.method.obj.name().String(),
+				subject: sc.method.id.last().String(),
 				object:  sel.String(),
 				action:  mutActRLock,
 				reason:  "annotation",
@@ -373,20 +385,20 @@ func (sc *syntChecker) onExec(obj id) []error {
 
 func (sc *syntChecker) checkExec(obj id) []error {
 	sel := obj.selector()
-	if !sel.eq(sc.method.obj.selector()) {
+	if !sel.eq(sc.method.id.selector()) {
 		return nil
 	}
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
 		return nil
 	}
-	callee, found := sc.pkg.types[sc.typ].methods[obj.name().String()]
+	callee, found := sc.pkg.types[sc.typ].methods[obj.last().String()]
 	if !found {
-		return []error{errors.Errorf("unknown method %s", obj.name())}
+		return []error{errors.Errorf("unknown method %s", obj.last())}
 	}
 	var result []error
 	for _, a := range callee.annotations {
 		var state mutexState
-		switch a.obj.name().String() {
+		switch a.obj.last().String() {
 		case "Lock":
 			state = mutStateL
 		case "RLock":
@@ -398,7 +410,7 @@ func (sc *syntChecker) checkExec(obj id) []error {
 			result = append(result, err)
 		} else if !gotLock {
 			if err := sc.state.ensureState(a.obj.selector().String(), state); err != nil {
-				err.reason = "in call to " + callee.obj.name().String()
+				err.reason = "in call to " + callee.id.last().String()
 				result = append(result, err)
 			}
 		}
@@ -407,12 +419,12 @@ func (sc *syntChecker) checkExec(obj id) []error {
 }
 
 func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err *invalidStateError) {
-	caleeName := aCalee.obj.name().String()
+	caleeName := aCalee.obj.last().String()
 	if caleeName != "Lock" && caleeName != "RLock" {
 		return
 	}
 	for _, aCaller := range sc.method.annotations {
-		callerName := aCaller.obj.name().String()
+		callerName := aCaller.obj.last().String()
 		if callerName != "Lock" && callerName != "RLock" {
 			continue
 		}

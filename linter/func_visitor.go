@@ -186,7 +186,7 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		// and then visit arguments.
 		if !isFuncLit {
 			ast.Walk(cv, typed.Fun)
-			n := cv.callId.name()
+			n := cv.callId.last()
 			cv.callId = cv.callId.selector()
 			cv.callId.append(n.String() + "()")
 		}

@@ -49,8 +49,8 @@ func makePkgDesc(pkg *ast.Package) *pkgDesc {
 	}
 	sort.Strings(allFiles)
 	desc := &pkgDesc{
-		types:   make(map[string]*typeDesc),
-		globals: make(map[string]ast.Node),
+		types:       make(map[string]*typeDesc),
+		globalFuncs: make(map[string]*methodDesc),
 	}
 	fv := &fileVisitor{desc}
 	for _, name := range allFiles {
