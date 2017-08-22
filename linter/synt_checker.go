@@ -248,11 +248,9 @@ func (sc *syntChecker) assignMethod() {
 }
 
 func (sc *syntChecker) buildObjects() {
-	if sc.method.id.len() > 0 {
-		recvName := sc.method.id.String()
-		panic(sc.method.id.String())
+	if sc.method.id.len() == 2 {
 		sc.stk.push()
-		sc.stk.addObject(idFromParts(recvName))
+		sc.stk.addObject(sc.method.id.first())
 	}
 }
 
@@ -320,7 +318,6 @@ func (sc *syntChecker) newObject(name string, init id) {
 
 	for id, obj := range sc.stk.objects {
 		println("obj = ", id, "  vars: ")
-		print("  ")
 		for v, k := range obj.vars {
 			println("    ", v, " obj: ", k.objectID)
 		}

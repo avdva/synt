@@ -235,6 +235,13 @@ func (t *Type1) func15() {
 	if t := new(f3); t != nil {
 		t.func3_2()
 	}
+	if true {
+		var t f3
+		t.func3()
+	} else {
+		var t f3
+		t.func3()
+	}
 	{
 		t := f3{}
 		t.func3()
