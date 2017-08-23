@@ -20,6 +20,7 @@ type scope struct {
 
 type stack struct {
 	lastID  int
+	prefix  string
 	objects map[string]object
 	scopes  []scope
 }
@@ -30,14 +31,16 @@ func newScope() scope {
 	}
 }
 
-func newStack() *stack {
+func newStack(prefix string) *stack {
 	return &stack{
 		objects: make(map[string]object),
 		scopes:  []scope{newScope()},
+		prefix:  prefix,
 	}
 }
 
 func (stk *stack) push() {
+	//panic("dsf")
 	println("push")
 	stk.scopes = append(stk.scopes, copyScope(*stk.lastScope()))
 }
@@ -54,7 +57,7 @@ func (stk *stack) lastScope() *scope {
 func (stk *stack) newID() string {
 	newID := strconv.Itoa(stk.lastID)
 	stk.lastID++
-	return newID
+	return stk.prefix + "." + newID
 }
 
 func (stk *stack) newObject() object {
@@ -103,6 +106,19 @@ func (stk *stack) findObjectByVar(varName string) string {
 	return ""
 }
 
+func (stk *stack) branch(count int) []*stack {
+	var result []*stack
+	for i := 0; i < count; i++ {
+		s := newStack(stk.prefix + ".b" + strconv.Itoa(i))
+		for _, sc := range stk.scopes {
+			s.scopes = append(s.scopes, copyScope(sc))
+		}
+		s.objects = stk.objects
+		result = append(result, s)
+	}
+	return result
+}
+
 func copyScope(sc scope) scope {
 	result := newScope()
 	for k, v := range sc.vars {
@@ -112,9 +128,12 @@ func copyScope(sc scope) scope {
 }
 
 func copyStack(stk stack) *stack {
-	result := newStack()
+	result := newStack(stk.prefix + ".cp")
 	for _, sc := range stk.scopes {
 		stk.scopes = append(stk.scopes, copyScope(sc))
+	}
+	for k, v := range stk.objects {
+		stk.objects[k] = v
 	}
 	return result
 }

@@ -71,6 +71,20 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.IfStmt:
 		fv.handleIf(typed)
 		return nil
+	case *ast.RangeStmt:
+		fv.sc.scopeStart()
+		if typed.Tok == token.DEFINE {
+			if ident, ok := typed.Key.(*ast.Ident); ok {
+				fv.sc.newObject(ident.Name, id{})
+			}
+			if ident, ok := typed.Value.(*ast.Ident); ok {
+				fv.sc.newObject(ident.Name, id{})
+			}
+		}
+		ast.Walk(fv, typed.X)
+		ast.Walk(fv, typed.Body)
+		fv.sc.scopeEnd()
+		return nil
 	case *ast.ForStmt:
 		fv.sc.scopeStart()
 		if typed.Init != nil {
@@ -102,6 +116,10 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 		fv.vr.exitType = exitReturn
 		return nil
+	case *ast.ValueSpec:
+		for _, ident := range typed.Names {
+			fv.sc.newObject(ident.Name, id{})
+		}
 	case *ast.AssignStmt:
 		if typed.Tok == token.DEFINE {
 			for _, lhs := range typed.Lhs {

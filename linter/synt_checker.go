@@ -225,7 +225,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		pkg:   pkg,
 		typ:   typ,
 		fun:   fun,
-		stk:   newStack(),
+		stk:   newStack("root"),
 		state: newSyntState(),
 	}
 	result.assignMethod()
@@ -276,12 +276,13 @@ func (sc *syntChecker) newContext(node ast.Node) {
 }
 
 func (sc *syntChecker) branchStart(count int) []stateChanger {
+	stks := sc.stk.branch(count)
 	for i := 0; i < count; i++ {
 		newSc := &syntChecker{
 			pkg:    sc.pkg,
 			typ:    sc.typ,
 			state:  copyState(sc.state),
-			stk:    copyStack(*sc.stk),
+			stk:    stks[i],
 			method: sc.method,
 		}
 		newSc.stk.push()
@@ -314,6 +315,20 @@ func (sc *syntChecker) scopeEnd() {
 }
 
 func (sc *syntChecker) newObject(name string, init id) {
+
+	println("----------------")
+
+	for id, obj := range sc.stk.objects {
+		println("obj = ", id, "  vars: ")
+		for v, k := range obj.vars {
+			println("    ", v, " obj: ", k.objectID)
+		}
+	}
+	for id, v := range sc.stk.lastScope().vars {
+		println("var ", id, "  of ", v.objectID)
+	}
+	println("+++++++++++++++++++")
+
 	sc.stk.addObject(idFromParts(name))
 
 	for id, obj := range sc.stk.objects {

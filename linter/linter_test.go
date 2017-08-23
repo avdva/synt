@@ -90,11 +90,11 @@ func TestFunc5(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func7")
+	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func7"]
+	func5Desc := sc.pkg.types["Type1"].methods["func5"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {

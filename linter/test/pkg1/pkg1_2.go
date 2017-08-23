@@ -81,6 +81,10 @@ func (t *Type1) func5() {
 			t.m.Lock()
 		}()
 	}
+	for k, v := range map[f3]int{} {
+		k.func3()
+		_ = v
+	}
 	freeFunc()
 	var b int
 	a, b = 7, t.func4(t.func3())
