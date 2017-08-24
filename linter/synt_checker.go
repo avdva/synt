@@ -225,7 +225,7 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 		pkg:   pkg,
 		typ:   typ,
 		fun:   fun,
-		stk:   newStack("root"),
+		stk:   newStack(&idGen{}),
 		state: newSyntState(),
 	}
 	result.assignMethod()

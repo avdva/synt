@@ -4,6 +4,16 @@ package linter
 
 import "strconv"
 
+type idGen struct {
+	lastID int
+}
+
+func (id *idGen) newID() string {
+	newID := strconv.Itoa(id.lastID)
+	id.lastID++
+	return newID
+}
+
 type object struct {
 	id   string
 	vars map[string]variable
@@ -19,8 +29,7 @@ type scope struct {
 }
 
 type stack struct {
-	lastID  int
-	prefix  string
+	gen     *idGen
 	objects map[string]object
 	scopes  []scope
 }
@@ -31,11 +40,11 @@ func newScope() scope {
 	}
 }
 
-func newStack(prefix string) *stack {
+func newStack(gen *idGen) *stack {
 	return &stack{
+		gen:     gen,
 		objects: make(map[string]object),
 		scopes:  []scope{newScope()},
-		prefix:  prefix,
 	}
 }
 
@@ -54,14 +63,8 @@ func (stk *stack) lastScope() *scope {
 	return &stk.scopes[len(stk.scopes)-1]
 }
 
-func (stk *stack) newID() string {
-	newID := strconv.Itoa(stk.lastID)
-	stk.lastID++
-	return stk.prefix + "." + newID
-}
-
 func (stk *stack) newObject() object {
-	return object{id: stk.newID(), vars: make(map[string]variable)}
+	return object{id: stk.gen.newID(), vars: make(map[string]variable)}
 }
 
 func (stk *stack) addObject(objID id) string {
@@ -106,10 +109,31 @@ func (stk *stack) findObjectByVar(varName string) string {
 	return ""
 }
 
+func (stk *stack) findObjectByID(objID id) string {
+	if objID.len() == 0 {
+		return ""
+	}
+	rootID := stk.findObjectByVar(objID.parts[0])
+	if objID.len() == 1 || len(rootID) == 0 {
+		return rootID
+	}
+	obj := stk.objects[rootID]
+	vars := obj.vars
+	for i := 1; i < objID.len(); i++ {
+		v, found := vars[objID.part(i)]
+		if !found {
+			return ""
+		}
+		obj = stk.objects[v.objectID]
+		vars = obj.vars
+	}
+	return obj.id
+}
+
 func (stk *stack) branch(count int) []*stack {
 	var result []*stack
 	for i := 0; i < count; i++ {
-		s := newStack(stk.prefix + ".b" + strconv.Itoa(i))
+		s := newStack(stk.gen)
 		for _, sc := range stk.scopes {
 			s.scopes = append(s.scopes, copyScope(sc))
 		}
@@ -128,7 +152,7 @@ func copyScope(sc scope) scope {
 }
 
 func copyStack(stk stack) *stack {
-	result := newStack(stk.prefix + ".cp")
+	result := newStack(&idGen{lastID: stk.gen.lastID})
 	for _, sc := range stk.scopes {
 		stk.scopes = append(stk.scopes, copyScope(sc))
 	}
