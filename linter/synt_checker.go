@@ -210,14 +210,15 @@ func (ss *syntState) ensureState(name string, state mutexState) *invalidStateErr
 }
 
 type syntChecker struct {
-	pkg      *pkgDesc
-	typ      string
-	fun      string
-	branches []stateChanger
-	state    *syntState
-	method   *methodDesc
-	stk      *stack
-	reports  []Report
+	pkg               *pkgDesc
+	typ               string
+	fun               string
+	branches          []stateChanger
+	state             *syntState
+	method            *methodDesc
+	parsedAnnotations []annotation
+	stk               *stack
+	reports           []Report
 }
 
 func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
@@ -230,7 +231,24 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	}
 	result.assignMethod()
 	result.buildObjects()
+	result.parseAnnotations()
 	return result
+}
+
+func (sc *syntChecker) parseAnnotations() {
+	for _, a := range sc.method.annotations {
+		sel := a.obj.selector()
+		id := sc.stk.findObjectByID(sel)
+		if len(id) == 0 {
+			id = sc.stk.addObject(sel)
+		}
+		new := annotation{
+			not: a.not,
+			obj: idFromParts(id, a.obj.last().String()),
+		}
+		sc.parsedAnnotations = append(sc.parsedAnnotations, new)
+		println(new.obj.String())
+	}
 }
 
 func (sc *syntChecker) assignMethod() {
@@ -356,9 +374,10 @@ func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
 func (sc *syntChecker) onExec(obj id) []error {
 	var result []error
 	sel := obj.selector()
+	objID := sc.stk.findObjectByID(sel)
 	switch obj.last().String() {
 	case "Lock":
-		if !sc.canLock(obj) {
+		if !sc.canLock(objID) {
 			result = append(result, &invalidActError{
 				subject: sc.method.id.last().String(),
 				object:  sel.String(),
@@ -370,7 +389,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 			result = append(result, err)
 		}
 	case "RLock":
-		if !sc.canLock(obj) {
+		if !sc.canLock(objID) {
 			result = append(result, &invalidActError{
 				subject: sc.method.id.last().String(),
 				object:  sel.String(),
@@ -457,9 +476,9 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 	return
 }
 
-func (sc *syntChecker) canLock(obj id) bool {
-	for _, a := range sc.method.annotations {
-		if a.obj.selector().eq(obj.selector()) && !a.not {
+func (sc *syntChecker) canLock(objID string) bool {
+	for _, a := range sc.parsedAnnotations {
+		if a.obj.part(0) == objID && !a.not {
 			return false
 		}
 	}
