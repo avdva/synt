@@ -22,7 +22,7 @@ const (
 )
 
 const (
-	mutActLock = iota
+	mutActLock mutexAct = iota
 	mutActRLock
 	mutActUnlock
 	mutActRUnlock
@@ -185,16 +185,15 @@ func (ss *syntState) mutState(name string) (mutexState, bool) {
 	return state, found
 }
 
-func (ss *syntState) stateChange(name string, act mutexAct) error {
-	old, _ := ss.mutState(name)
+func (ss *syntState) stateChange(id string, act mutexAct) *invalidActError {
+	old, _ := ss.mutState(id)
 	change := stateChangeTable[old][act]
-	ss.mut[name] = change.state
+	ss.mut[id] = change.state
 	if change.err == nil {
 		return nil
 	}
 	result := *change.err
 	result.action = act
-	result.object = name
 	return &result
 }
 
@@ -218,6 +217,7 @@ type syntChecker struct {
 	method            *methodDesc
 	parsedAnnotations []annotation
 	stk               *stack
+	ourID             string
 	reports           []Report
 }
 
@@ -268,7 +268,7 @@ func (sc *syntChecker) assignMethod() {
 func (sc *syntChecker) buildObjects() {
 	if sc.method.id.len() == 2 {
 		sc.stk.push()
-		sc.stk.addObject(sc.method.id.first())
+		sc.ourID = sc.stk.addObject(sc.method.id.first())
 	}
 }
 
@@ -375,37 +375,37 @@ func (sc *syntChecker) onExec(obj id) []error {
 	var result []error
 	sel := obj.selector()
 	objID := sc.stk.findObjectByID(sel)
-	switch obj.last().String() {
-	case "Lock":
+	if len(objID) == 0 {
+		if sel.len() == 1 {
+			return []error{errors.Errorf("unknown object: %s", sel.String())}
+		}
+		objID = sc.stk.addObject(sel)
+	}
+	switch call := obj.last().String(); call {
+	case "Lock", "RLock":
+		act := mutActLock
+		if call == "RLock" {
+			act = mutActRLock
+		}
 		if !sc.canLock(objID) {
 			result = append(result, &invalidActError{
 				subject: sc.method.id.last().String(),
 				object:  sel.String(),
-				action:  mutActLock,
+				action:  act,
 				reason:  "annotation",
 			})
 		}
-		if err := sc.state.stateChange(sel.String(), mutActLock); err != nil {
+		if err := sc.state.stateChange(objID, act); err != nil {
+			err.object = sel.String()
 			result = append(result, err)
 		}
-	case "RLock":
-		if !sc.canLock(objID) {
-			result = append(result, &invalidActError{
-				subject: sc.method.id.last().String(),
-				object:  sel.String(),
-				action:  mutActRLock,
-				reason:  "annotation",
-			})
+	case "Unlock", "RUnlock":
+		act := mutActUnlock
+		if call == "RUnlock" {
+			act = mutActRUnlock
 		}
-		if err := sc.state.stateChange(sel.String(), mutActRLock); err != nil {
-			result = append(result, err)
-		}
-	case "Unlock":
-		if err := sc.state.stateChange(sel.String(), mutActUnlock); err != nil {
-			result = append(result, err)
-		}
-	case "RUnlock":
-		if err := sc.state.stateChange(sel.String(), mutActRUnlock); err != nil {
+		if err := sc.state.stateChange(objID, act); err != nil {
+			err.object = sel.String()
 			result = append(result, err)
 		}
 	default:
@@ -416,7 +416,11 @@ func (sc *syntChecker) onExec(obj id) []error {
 
 func (sc *syntChecker) checkExec(obj id) []error {
 	sel := obj.selector()
-	if !sel.eq(sc.method.id.selector()) {
+	objID := sc.stk.findObjectByID(sel)
+	if len(objID) == 0 {
+		return nil
+	}
+	if objID != sc.ourID { // TODO(avd) - call on internal objects.
 		return nil
 	}
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
@@ -440,8 +444,13 @@ func (sc *syntChecker) checkExec(obj id) []error {
 		if gotLock, err := sc.checkCallerAnnotation(a); err != nil {
 			result = append(result, err)
 		} else if !gotLock {
-			if err := sc.state.ensureState(a.obj.selector().String(), state); err != nil {
+			id := sc.stk.findObjectByID(a.obj.selector())
+			if len(id) == 0 { // TODO(avd) - search by annotation's receiver name.
+				continue
+			}
+			if err := sc.state.ensureState(id, state); err != nil {
 				err.reason = "in call to " + callee.id.last().String()
+				err.object = a.obj.selector().String()
 				result = append(result, err)
 			}
 		}

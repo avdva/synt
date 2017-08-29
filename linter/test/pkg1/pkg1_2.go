@@ -24,6 +24,11 @@ func (t *Type1) func3_3() {
 	t.func3_2()
 }
 
+func (t1 *Type1) func3_3_1() {
+	t1.m.RLock()
+	t1.func3_2()
+}
+
 // synt:t.m.RLock
 func (t *Type1) func3_4() {
 	t.func3_2()

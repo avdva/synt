@@ -144,6 +144,18 @@ func TestFunc3_3(t *testing.T) {
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_3")
 }
 
+func TestFunc3_3_1(t *testing.T) {
+	expected := []error{
+		&invalidStateError{
+			object:   "t1.m",
+			expected: mutStateL,
+			actual:   mutStateR,
+			reason:   "in call to func3_2",
+		},
+	}
+	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_3_1")
+}
+
 func TestFunc3_4(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
