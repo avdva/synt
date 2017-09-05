@@ -84,7 +84,7 @@ func TestLinterParseComments(t *testing.T) {
 	a.NoError(comparePkgDesc(expected, actual))
 }
 
-func TestFunc5(t *testing.T) {
+func TestPrintFunc(t *testing.T) {
 	a := assert.New(t)
 	l, err := makeLinter("./test/pkg1", "pkg1")
 	if !a.NoError(err) {

@@ -51,6 +51,14 @@ func (i id) first() id {
 	return id{parts: []string{i.parts[0]}}
 }
 
+func (i id) copy() id {
+	return idFromParts(i.parts...)
+}
+
+func (i id) set(idx int, part string) {
+	i.parts[idx] = part
+}
+
 func (i *id) append(part string) {
 	i.parts = append(i.parts, part)
 }

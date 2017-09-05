@@ -426,12 +426,12 @@ func (sc *syntChecker) checkExec(obj id) []error {
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
 		return nil
 	}
-	callee, found := sc.pkg.types[sc.typ].methods[obj.last().String()]
+	calee, found := sc.pkg.types[sc.typ].methods[obj.last().String()]
 	if !found {
 		return []error{errors.Errorf("unknown method %s", obj.last())}
 	}
 	var result []error
-	for _, a := range callee.annotations {
+	for _, a := range calee.annotations {
 		var state mutexState
 		switch a.obj.last().String() {
 		case "Lock":
@@ -444,13 +444,17 @@ func (sc *syntChecker) checkExec(obj id) []error {
 		if gotLock, err := sc.checkCallerAnnotation(a); err != nil {
 			result = append(result, err)
 		} else if !gotLock {
-			id := sc.stk.findObjectByID(a.obj.selector())
+			obj := a.obj.copy()
+			if obj.first().eq(calee.id.first()) {
+				obj.set(0, sc.method.id.part(0))
+			}
+			id := sc.stk.findObjectByID(obj.selector())
 			if len(id) == 0 { // TODO(avd) - search by annotation's receiver name.
 				continue
 			}
 			if err := sc.state.ensureState(id, state); err != nil {
-				err.reason = "in call to " + callee.id.last().String()
-				err.object = a.obj.selector().String()
+				err.reason = "in call to " + calee.id.last().String()
+				err.object = obj.selector().String()
 				result = append(result, err)
 			}
 		}
