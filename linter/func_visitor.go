@@ -20,12 +20,12 @@ const (
 
 type stateChanger interface {
 	newContext(node ast.Node)
-	newObject(obj string, init id)
+	newObject(obj string, init dotExpr)
 	scopeStart()
 	scopeEnd()
 	branchStart(count int) []stateChanger
 	branchEnd([]visitResult)
-	expr(op int, obj id, pos token.Pos)
+	expr(op int, obj dotExpr, pos token.Pos)
 }
 
 type deferItem struct {
@@ -75,10 +75,10 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		fv.sc.scopeStart()
 		if typed.Tok == token.DEFINE {
 			if ident, ok := typed.Key.(*ast.Ident); ok {
-				fv.sc.newObject(ident.Name, id{})
+				fv.sc.newObject(ident.Name, dotExpr{})
 			}
 			if ident, ok := typed.Value.(*ast.Ident); ok {
-				fv.sc.newObject(ident.Name, id{})
+				fv.sc.newObject(ident.Name, dotExpr{})
 			}
 		}
 		ast.Walk(fv, typed.X)
@@ -118,13 +118,13 @@ func (fv *funcVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.ValueSpec:
 		for _, ident := range typed.Names {
-			fv.sc.newObject(ident.Name, id{})
+			fv.sc.newObject(ident.Name, dotExpr{})
 		}
 	case *ast.AssignStmt:
 		if typed.Tok == token.DEFINE {
 			for _, lhs := range typed.Lhs {
 				if ident, ok := lhs.(*ast.Ident); ok {
-					fv.sc.newObject(ident.Name, id{})
+					fv.sc.newObject(ident.Name, dotExpr{})
 				}
 			}
 		}
@@ -183,13 +183,13 @@ func handleDefers(fv *funcVisitor, defers []deferItem) {
 type callVisitor struct {
 	sc      stateChanger
 	parent  ast.Visitor
-	callId  id
+	call    dotExpr
 	callPos []token.Pos
 }
 
-func (cv *callVisitor) walk(node ast.Node) id {
+func (cv *callVisitor) walk(node ast.Node) dotExpr {
 	ast.Walk(cv, node)
-	return cv.callId
+	return cv.call
 }
 
 func (cv *callVisitor) callPosAt(i int) token.Pos {
@@ -204,9 +204,9 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		// and then visit arguments.
 		if !isFuncLit {
 			ast.Walk(cv, typed.Fun)
-			n := cv.callId.last()
-			cv.callId = cv.callId.selector()
-			cv.callId.append(n.String() + "()")
+			n := cv.call.field()
+			cv.call = cv.call.selector()
+			cv.call.append(n.String() + "()")
 		}
 		for _, arg := range typed.Args {
 			ast.Walk(cv.parent, arg)
@@ -219,11 +219,11 @@ func (cv *callVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	case *ast.SelectorExpr:
 		ast.Walk(cv, typed.X)
-		cv.callId.append(typed.Sel.Name)
+		cv.call.append(typed.Sel.Name)
 		cv.callPos = append(cv.callPos, typed.Sel.NamePos)
 		return nil
 	case *ast.Ident:
-		cv.callId.append(typed.Name)
+		cv.call.append(typed.Name)
 		cv.callPos = append(cv.callPos, typed.NamePos)
 		return nil
 	}
@@ -246,7 +246,7 @@ func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(sm, arg)
 		}
 		if expanded := expandCall(typed.Fun); expanded != nil {
-			sm.sc.expr(exprExec, idFromParts(expanded...), typed.Pos())
+			sm.sc.expr(exprExec, dotExprFromParts(expanded...), typed.Pos())
 		}
 	case *ast.AssignStmt:
 	case *ast.IncDecStmt:
@@ -309,8 +309,8 @@ func expandIf(node *ast.IfStmt) [][]ast.Node {
 	return result
 }
 
-func firstCall(call id) id {
-	var result id
+func firstCall(call dotExpr) dotExpr {
+	var result dotExpr
 	for i := 0; i < call.len(); i++ {
 		part := call.part(i)
 		if strings.HasSuffix(part, "()") {

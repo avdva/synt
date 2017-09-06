@@ -231,24 +231,8 @@ func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
 	}
 	result.assignMethod()
 	result.buildObjects()
-	result.parseAnnotations()
+	result.parsedAnnotations = parseAnnotations(result.method.annotations, result.stk)
 	return result
-}
-
-func (sc *syntChecker) parseAnnotations() {
-	for _, a := range sc.method.annotations {
-		sel := a.obj.selector()
-		id := sc.stk.findObjectByID(sel)
-		if len(id) == 0 {
-			id = sc.stk.addObject(sel)
-		}
-		new := annotation{
-			not: a.not,
-			obj: idFromParts(id, a.obj.last().String()),
-		}
-		sc.parsedAnnotations = append(sc.parsedAnnotations, new)
-		println(new.obj.String())
-	}
 }
 
 func (sc *syntChecker) assignMethod() {
@@ -266,9 +250,9 @@ func (sc *syntChecker) assignMethod() {
 }
 
 func (sc *syntChecker) buildObjects() {
-	if sc.method.id.len() == 2 {
+	if sc.method.name.len() == 2 {
 		sc.stk.push()
-		sc.ourID = sc.stk.addObject(sc.method.id.first())
+		sc.ourID = sc.stk.addObject(sc.method.name.first())
 	}
 }
 
@@ -284,7 +268,7 @@ func (sc *syntChecker) newContext(node ast.Node) {
 		typ:   sc.typ,
 		state: newSyntState(),
 		method: &methodDesc{
-			id: sc.method.id,
+			name: sc.method.name,
 		},
 		stk: copyStack(*sc.stk),
 	}
@@ -332,7 +316,7 @@ func (sc *syntChecker) scopeEnd() {
 	sc.stk.pop()
 }
 
-func (sc *syntChecker) newObject(name string, init id) {
+func (sc *syntChecker) newObject(name string, init dotExpr) {
 
 	println("----------------")
 
@@ -347,7 +331,7 @@ func (sc *syntChecker) newObject(name string, init id) {
 	}
 	println("+++++++++++++++++++")
 
-	sc.stk.addObject(idFromParts(name))
+	sc.stk.addObject(dotExprFromParts(name))
 
 	for id, obj := range sc.stk.objects {
 		println("obj = ", id, "  vars: ")
@@ -361,7 +345,7 @@ func (sc *syntChecker) newObject(name string, init id) {
 	println("----------------")
 }
 
-func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
+func (sc *syntChecker) expr(op int, obj dotExpr, pos token.Pos) {
 	switch op {
 	case exprExec:
 		errors := sc.onExec(obj)
@@ -371,17 +355,17 @@ func (sc *syntChecker) expr(op int, obj id, pos token.Pos) {
 	}
 }
 
-func (sc *syntChecker) onExec(obj id) []error {
+func (sc *syntChecker) onExec(obj dotExpr) []error {
 	var result []error
 	sel := obj.selector()
-	objID := sc.stk.findObjectByID(sel)
+	objID := sc.stk.objectIDForExpr(sel)
 	if len(objID) == 0 {
 		if sel.len() == 1 {
 			return []error{errors.Errorf("unknown object: %s", sel.String())}
 		}
 		objID = sc.stk.addObject(sel)
 	}
-	switch call := obj.last().String(); call {
+	switch call := obj.field().String(); call {
 	case "Lock", "RLock":
 		act := mutActLock
 		if call == "RLock" {
@@ -389,7 +373,7 @@ func (sc *syntChecker) onExec(obj id) []error {
 		}
 		if !sc.canLock(objID) {
 			result = append(result, &invalidActError{
-				subject: sc.method.id.last().String(),
+				subject: sc.method.name.field().String(),
 				object:  sel.String(),
 				action:  act,
 				reason:  "annotation",
@@ -414,9 +398,8 @@ func (sc *syntChecker) onExec(obj id) []error {
 	return result
 }
 
-func (sc *syntChecker) checkExec(obj id) []error {
-	sel := obj.selector()
-	objID := sc.stk.findObjectByID(sel)
+func (sc *syntChecker) checkExec(obj dotExpr) []error {
+	objID := sc.stk.objectIDForExpr(obj.selector())
 	if len(objID) == 0 {
 		return nil
 	}
@@ -426,14 +409,19 @@ func (sc *syntChecker) checkExec(obj id) []error {
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
 		return nil
 	}
-	calee, found := sc.pkg.types[sc.typ].methods[obj.last().String()]
+	calee, found := sc.pkg.types[sc.typ].methods[obj.field().String()]
 	if !found {
-		return []error{errors.Errorf("unknown method %s", obj.last())}
+		return []error{errors.Errorf("unknown method %s", obj.field())}
 	}
 	var result []error
+	caleeStk := newStack(&idGen{})
+	caleeStk.push()
+	caleeObjID := caleeStk.addObject(calee.name.first())
+	parsed := parseAnnotations(calee.annotations, caleeStk)
+	_, _ = caleeObjID, parsed
 	for _, a := range calee.annotations {
 		var state mutexState
-		switch a.obj.last().String() {
+		switch a.obj.field().String() {
 		case "Lock":
 			state = mutStateL
 		case "RLock":
@@ -445,15 +433,15 @@ func (sc *syntChecker) checkExec(obj id) []error {
 			result = append(result, err)
 		} else if !gotLock {
 			obj := a.obj.copy()
-			if obj.first().eq(calee.id.first()) {
-				obj.set(0, sc.method.id.part(0))
+			if obj.first().eq(calee.name.first()) {
+				obj.set(0, sc.method.name.part(0))
 			}
-			id := sc.stk.findObjectByID(obj.selector())
+			id := sc.stk.objectIDForExpr(obj.selector())
 			if len(id) == 0 { // TODO(avd) - search by annotation's receiver name.
 				continue
 			}
 			if err := sc.state.ensureState(id, state); err != nil {
-				err.reason = "in call to " + calee.id.last().String()
+				err.reason = "in call to " + calee.name.field().String()
 				err.object = obj.selector().String()
 				result = append(result, err)
 			}
@@ -463,12 +451,12 @@ func (sc *syntChecker) checkExec(obj id) []error {
 }
 
 func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err *invalidStateError) {
-	caleeName := aCalee.obj.last().String()
+	caleeName := aCalee.obj.field().String()
 	if caleeName != "Lock" && caleeName != "RLock" {
 		return
 	}
 	for _, aCaller := range sc.method.annotations {
-		callerName := aCaller.obj.last().String()
+		callerName := aCaller.obj.field().String()
 		if callerName != "Lock" && callerName != "RLock" {
 			continue
 		}
@@ -530,4 +518,21 @@ func copyState(st *syntState) *syntState {
 		result.mut[k] = v
 	}
 	return result
+}
+
+func parseAnnotations(annotations []annotation, stk *stack) []annotation {
+	var parsedAnnotations []annotation
+	for _, a := range annotations {
+		sel := a.obj.selector()
+		id := stk.objectIDForExpr(sel)
+		if len(id) == 0 {
+			id = stk.addObject(sel)
+		}
+		new := annotation{
+			not: a.not,
+			obj: dotExprFromParts(id, a.obj.field().String()),
+		}
+		parsedAnnotations = append(parsedAnnotations, new)
+	}
+	return parsedAnnotations
 }

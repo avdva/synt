@@ -67,7 +67,7 @@ func (stk *stack) newObject() object {
 	return object{id: stk.gen.newID(), vars: make(map[string]variable)}
 }
 
-func (stk *stack) addObject(objID id) string {
+func (stk *stack) addObject(objID dotExpr) string {
 	println("add ", objID.String())
 	if objID.len() == 0 {
 		return ""
@@ -75,10 +75,10 @@ func (stk *stack) addObject(objID id) string {
 	if objID.len() == 1 {
 		obj := stk.newObject()
 		stk.objects[obj.id] = obj
-		stk.lastScope().vars[objID.last().String()] = variable{name: objID.last().String(), objectID: obj.id}
+		stk.lastScope().vars[objID.field().String()] = variable{name: objID.field().String(), objectID: obj.id}
 		return obj.id
 	} else {
-		curID := stk.findObjectByVar(objID.part(0))
+		curID := stk.objectIDForVar(objID.part(0))
 		if len(curID) == 0 {
 			curID = stk.addObject(objID.first())
 		}
@@ -99,7 +99,7 @@ func (stk *stack) addObject(objID id) string {
 	}
 }
 
-func (stk *stack) findObjectByVar(varName string) string {
+func (stk *stack) objectIDForVar(varName string) string {
 	for i := len(stk.scopes) - 1; i >= 0; i-- {
 		sc := stk.scopes[i]
 		if v, found := sc.vars[varName]; found {
@@ -109,11 +109,11 @@ func (stk *stack) findObjectByVar(varName string) string {
 	return ""
 }
 
-func (stk *stack) findObjectByID(objID id) string {
+func (stk *stack) objectIDForExpr(objID dotExpr) string {
 	if objID.len() == 0 {
 		return ""
 	}
-	rootID := stk.findObjectByVar(objID.parts[0])
+	rootID := stk.objectIDForVar(objID.part(0))
 	if objID.len() == 1 || len(rootID) == 0 {
 		return rootID
 	}

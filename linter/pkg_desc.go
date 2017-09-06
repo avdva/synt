@@ -7,27 +7,27 @@ import (
 	"strings"
 )
 
-type id struct {
+type dotExpr struct {
 	parts []string
 }
 
-func idFromParts(parts ...string) id {
-	return id{parts: parts}
+func dotExprFromParts(parts ...string) dotExpr {
+	return dotExpr{parts: parts}
 }
 
-func (i id) String() string {
+func (i dotExpr) String() string {
 	return strings.Join(i.parts, ".")
 }
 
-func (i id) len() int {
+func (i dotExpr) len() int {
 	return len(i.parts)
 }
 
-func (i id) part(idx int) string {
+func (i dotExpr) part(idx int) string {
 	return i.parts[idx]
 }
 
-func (i id) eq(other id) bool {
+func (i dotExpr) eq(other dotExpr) bool {
 	if len(i.parts) != len(other.parts) {
 		return false
 	}
@@ -39,38 +39,38 @@ func (i id) eq(other id) bool {
 	return true
 }
 
-func (i *id) last() id {
-	return id{parts: []string{i.parts[len(i.parts)-1]}}
+func (i *dotExpr) field() dotExpr {
+	return dotExpr{parts: []string{i.parts[len(i.parts)-1]}}
 }
 
-func (i id) selector() id {
-	return id{parts: i.parts[:len(i.parts)-1]}
+func (i dotExpr) selector() dotExpr {
+	return dotExpr{parts: i.parts[:len(i.parts)-1]}
 }
 
-func (i id) first() id {
-	return id{parts: []string{i.parts[0]}}
+func (i dotExpr) first() dotExpr {
+	return dotExpr{parts: []string{i.parts[0]}}
 }
 
-func (i id) copy() id {
-	return idFromParts(i.parts...)
+func (i dotExpr) copy() dotExpr {
+	return dotExprFromParts(i.parts...)
 }
 
-func (i id) set(idx int, part string) {
+func (i dotExpr) set(idx int, part string) {
 	i.parts[idx] = part
 }
 
-func (i *id) append(part string) {
+func (i *dotExpr) append(part string) {
 	i.parts = append(i.parts, part)
 }
 
 type annotation struct {
-	obj id
+	obj dotExpr
 	not bool
 }
 
 type methodDesc struct {
 	node        ast.Node
-	id          id
+	name        dotExpr
 	annotations []annotation
 }
 
@@ -107,7 +107,7 @@ func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
 	td := d.descForType(typName)
 	td.methods[node.Name.Name] = methodDesc{
 		node:        node,
-		id:          idFromParts(recv.Names[0].Name, node.Name.Name),
+		name:        dotExprFromParts(recv.Names[0].Name, node.Name.Name),
 		annotations: annotations,
 	}
 }
@@ -172,6 +172,6 @@ func parseRecord(rec string) annotation {
 		result.not = true
 		rec = strings.TrimLeft(rec, "!")
 	}
-	result.obj = idFromParts(strings.Split(rec, ".")...)
+	result.obj = dotExprFromParts(strings.Split(rec, ".")...)
 	return result
 }

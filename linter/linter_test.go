@@ -27,30 +27,30 @@ func TestLinterParseComments(t *testing.T) {
 				methods: map[string]methodDesc{
 					"func1": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m", "Lock"), not: true},
+							annotation{obj: dotExprFromParts("t", "m", "Lock"), not: true},
 						},
 					},
 					"func2": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m", "Lock")},
+							annotation{obj: dotExprFromParts("t", "m", "Lock")},
 						},
 					},
 					"func3": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m", "RLock")},
-							annotation{obj: idFromParts("t", "mut", "Lock")},
+							annotation{obj: dotExprFromParts("t", "m", "RLock")},
+							annotation{obj: dotExprFromParts("t", "mut", "Lock")},
 						},
 					},
 					"func3_1": methodDesc{},
 					"func3_2": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m", "Lock")},
+							annotation{obj: dotExprFromParts("t", "m", "Lock")},
 						},
 					},
 					"func3_3": methodDesc{},
 					"func3_4": methodDesc{
 						annotations: []annotation{
-							annotation{obj: idFromParts("t", "m", "RLock")},
+							annotation{obj: dotExprFromParts("t", "m", "RLock")},
 						},
 					},
 					"func3_5": methodDesc{},
