@@ -20,7 +20,7 @@ func TestLinterParseComments(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	actual := makePkgDesc(l.pkg)
+	actual := makePkgDesc(l.pkg, l.fs)
 	expected := &pkgDesc{
 		types: map[string]*typeDesc{
 			"Type1": &typeDesc{
