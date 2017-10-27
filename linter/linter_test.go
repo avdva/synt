@@ -90,7 +90,7 @@ func TestPrintFunc(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, "Type1", "func5")
+	sc, err := makeSyntChecker(l.pkg, l.fs, "Type1", "func5")
 	if !a.NoError(err) {
 		return
 	}
@@ -342,7 +342,7 @@ func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, typ, fun)
+	sc, err := makeSyntChecker(l.pkg, l.fs, typ, fun)
 	if !a.NoError(err) {
 		return
 	}
@@ -369,8 +369,8 @@ func makeLinter(path, pkg string) (*Linter, error) {
 	return New(fs, pkgAst), nil
 }
 
-func makeSyntChecker(pkg *ast.Package, typ, fun string) (*syntChecker, error) {
-	desc := makePkgDesc(pkg)
+func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*syntChecker, error) {
+	desc := makePkgDesc(pkg, fs)
 	typeDesc, found := desc.types[typ]
 	if !found {
 		return nil, errors.Errorf("type %s not found", typ)

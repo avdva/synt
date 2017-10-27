@@ -151,7 +151,7 @@ func (fv *funcVisitor) handleIf(stmt *ast.IfStmt) {
 	fv.vr.defers = append(fv.vr.defers, di)
 }
 
-func (fv *funcVisitor) handleCall(expr *ast.CallExpr) {
+func (fv *funcVisitor) handleCall(expr ast.Node) {
 	cv := &callVisitor{sc: fv.sc, parent: fv}
 	cid := firstCall(cv.walk(expr))
 	if cid.len() > 0 {

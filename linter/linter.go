@@ -58,11 +58,23 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) *pkgDesc {
 		globalFuncs: make(map[string]*methodDesc),
 	}
 	conf := types.Config{Importer: importer.Default()}
-	pkga, err := conf.Check(".", fs, allFiles, nil)
+	info := &types.Info{
+		Types:  make(map[ast.Expr]types.TypeAndValue),
+		Defs:   make(map[*ast.Ident]types.Object),
+		Uses:   make(map[*ast.Ident]types.Object),
+		Scopes: make(map[ast.Node]*types.Scope),
+	}
+	pkga, err := conf.Check(".", fs, allFiles, info)
 	if err != nil {
 		log.Fatal(err) // type error
 	} else {
-		log.Fatal(pkga)
+		_ = pkga
+		for i := range info.Defs {
+			if i.Obj != nil && i.Obj.Kind == ast.Typ {
+				println(i.Name)
+			}
+		}
+		log.Fatal("")
 	}
 
 	fv := &fileVisitor{desc}
