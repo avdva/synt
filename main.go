@@ -5,19 +5,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
-	"strings"
 
 	"github.com/avdva/synt/linter"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	var exitCode int
+	var reports []linter.Report
 	flag.Parse()
 	toParse := flag.Args()
 	if len(toParse) == 0 {
@@ -25,40 +21,19 @@ func main() {
 	}
 	for _, name := range toParse {
 		if fi, err := os.Stat(name); err == nil && fi.IsDir() {
-			if !doDir(name) {
-				exitCode = 1
+			if rep, err := linter.DoDir(name); err == nil {
+				reports = append(reports, rep...)
+			} else {
+				log.Warnf("'%s' parse error: %v", name, err)
 			}
 		} else {
 			log.Warnf("not a directory: %s", name)
-			exitCode = 1
 		}
 	}
-	os.Exit(exitCode)
-}
-
-func doDir(name string) bool {
-	ok := true
-	notests := func(info os.FileInfo) bool {
-		return info.IsDir() || !strings.HasSuffix(info.Name(), "_test.go")
-	}
-	fs := token.NewFileSet()
-	if pkgs, err := parser.ParseDir(fs, name, notests, parser.ParseComments); err != nil {
-		log.Errorf("%s parsing error: %v", name, err)
-		ok = false
-	} else {
-		for _, pkg := range pkgs {
-			ok = doPackage(fs, pkg) && ok
-		}
-	}
-	return ok
-}
-
-func doPackage(fs *token.FileSet, pkg *ast.Package) bool {
-	l := linter.New(fs, pkg)
-	reports := l.Do()
-	//sort.Sort(reports)
 	for _, report := range reports {
-		fmt.Printf("%s: %s\n", report.Error().Error(), fs.Position(report.Pos()).String())
+		fmt.Printf("%s: %s\n", report.Err, report.Location)
 	}
-	return len(reports) == 0
+	if len(reports) > 0 {
+		os.Exit(1)
+	}
 }

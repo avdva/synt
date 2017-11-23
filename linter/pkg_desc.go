@@ -80,7 +80,7 @@ type fieldDesc struct {
 }
 
 type typeDesc struct {
-	node    ast.Node
+	expr    ast.Expr
 	methods map[string]methodDesc
 	fields  map[string]fieldDesc
 }
@@ -128,7 +128,7 @@ func (d *pkgDesc) addTypeSpec(node *ast.TypeSpec) {
 	switch typed := node.Type.(type) {
 	case *ast.StructType:
 		td := d.descForType(node.Name.Name)
-		td.node = node
+		//		td.expr = node
 		if typed.Fields == nil || len(typed.Fields.List) == 0 {
 			return
 		}
