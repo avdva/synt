@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/avdva/synt/linter"
+	"github.com/avdva/synt"
 
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	var reports []linter.Report
+	var reports []synt.Report
 	flag.Parse()
 	toParse := flag.Args()
 	if len(toParse) == 0 {
@@ -21,7 +21,7 @@ func main() {
 	}
 	for _, name := range toParse {
 		if fi, err := os.Stat(name); err == nil && fi.IsDir() {
-			if rep, err := linter.DoDir(name); err == nil {
+			if rep, err := synt.DoDir(name); err == nil {
 				reports = append(reports, rep...)
 			} else {
 				log.Warnf("'%s' parse error: %v", name, err)

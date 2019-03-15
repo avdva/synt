@@ -1,6 +1,6 @@
 // Copyright 2017 Aleksandr Demakin. All rights reserved.
 
-package linter
+package synt
 
 import (
 	"fmt"
