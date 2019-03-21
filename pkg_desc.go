@@ -4,6 +4,7 @@ package synt
 
 import (
 	"go/ast"
+	"go/types"
 	"strings"
 )
 
@@ -86,6 +87,7 @@ type typeDesc struct {
 }
 
 type pkgDesc struct {
+	info        *types.Info
 	types       map[string]*typeDesc
 	globalFuncs map[string]*methodDesc
 }

@@ -19,7 +19,7 @@ type syntChecker struct {
 	parsedAnnotations []annotation
 	stk               *stack
 	ourID             string
-	reports           []reportEntry
+	reports           []checkReport
 }
 
 func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
@@ -57,7 +57,7 @@ func (sc *syntChecker) buildObjects() {
 	}
 }
 
-func (sc *syntChecker) check() []reportEntry {
+func (sc *syntChecker) check() []checkReport {
 	fv := newFuncVisitor(sc, true)
 	fv.walk(sc.method.node)
 	return sc.reports
@@ -151,7 +151,7 @@ func (sc *syntChecker) expr(op int, obj dotExpr, pos token.Pos) {
 	case exprExec:
 		errors := sc.onExec(obj)
 		for _, e := range errors {
-			sc.reports = append(sc.reports, reportEntry{pos: pos, err: e})
+			sc.reports = append(sc.reports, checkReport{pos: pos, err: e})
 		}
 	}
 }

@@ -25,7 +25,7 @@ type Report struct {
 	Location string
 }
 
-type reportEntry struct {
+type checkReport struct {
 	pos token.Pos
 	err error
 }
@@ -34,25 +34,50 @@ func New(fs *token.FileSet, pkg *ast.Package) *Linter {
 	return &Linter{fs: fs, pkg: pkg}
 }
 
+func DoDir(name string) ([]Report, error) {
+	fs := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fs, name, notests, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	var result []Report
+	for _, pkg := range pkgs {
+		result = append(result, New(fs, pkg).Do()...)
+	}
+	return result, nil
+}
+
 func (l *Linter) Do() []Report {
-	var entries []reportEntry
-	desc := makePkgDesc(l.pkg, l.fs)
+	reports := checkPackage(l.pkg, l.fs)
+	return checkReportsToReports(reports, l.fs)
+}
+
+func checkPackage(pkg *ast.Package, fs *token.FileSet) []checkReport {
+	var reports []checkReport
+	desc := makePkgDesc(pkg, fs)
 	for typName, typDesc := range desc.types {
 		for methodName := range typDesc.methods {
 			sc := newSyntChecker(desc, typName, methodName)
-			entries = append(entries, sc.check()...)
+			reports = append(reports, sc.check()...)
 		}
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		lhs, rhs := l.fs.Position(entries[i].pos), l.fs.Position(entries[j].pos)
+	return reports
+}
+
+func checkReportsToReports(reports []checkReport, fs *token.FileSet) []Report {
+	sort.Slice(reports, func(i, j int) bool {
+		lhs, rhs := fs.Position(reports[i].pos), fs.Position(reports[j].pos)
 		if lhs.Filename != rhs.Filename {
 			return lhs.Filename < rhs.Filename
 		}
-		return entries[i].pos < entries[j].pos
+		return reports[i].pos < reports[j].pos
 	})
 	var result []Report
-	for _, e := range entries {
-		result = append(result, Report{Err: e.err.Error(), Location: l.fs.Position(e.pos).String()})
+	for _, e := range reports {
+		result = append(result, Report{
+			Err:      e.err.Error(),
+			Location: fs.Position(e.pos).String(),
+		})
 	}
 	return result
 }
@@ -65,10 +90,6 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) *pkgDesc {
 		allFiles = append(allFiles, file)
 	}
 	sort.Strings(allNames)
-	desc := &pkgDesc{
-		types:       make(map[string]*typeDesc),
-		globalFuncs: make(map[string]*methodDesc),
-	}
 	conf := types.Config{Importer: importer.Default()}
 	info := &types.Info{
 		Types:  make(map[ast.Expr]types.TypeAndValue),
@@ -91,25 +112,17 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) *pkgDesc {
 		}
 		log.Fatal("")
 	}
-
+	desc := &pkgDesc{
+		types:       make(map[string]*typeDesc),
+		globalFuncs: make(map[string]*methodDesc),
+		info:        info,
+	}
 	fv := &fileVisitor{desc}
 	for _, name := range allNames {
 		file := pkg.Files[name]
 		ast.Walk(fv, file)
 	}
 	return desc
-}
-
-func DoDir(name string) ([]Report, error) {
-	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, name, notests, parser.ParseComments)
-	if err != nil {
-		return nil, err
-	}
-	for _, pkg := range pkgs {
-		return New(fs, pkg).Do(), nil
-	}
-	return nil, nil
 }
 
 func notests(info os.FileInfo) bool {
