@@ -27,5 +27,7 @@ func someFunc() {
 }
 
 func main() {
+	var b int
+	_ = b
 	someFunc()
 }

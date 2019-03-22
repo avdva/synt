@@ -13,8 +13,11 @@ func TestLinterParsePackage(t *testing.T) {
 	r := require.New(t)
 	l, err := makeLinter("./testdata/pkg0", "main")
 	r.NoError(err)
-	desc := makePkgDesc(l.pkg, l.fs)
+	desc, err := makePkgDesc(l.pkg, l.fs)
+	r.NoError(err)
 	for id, object := range desc.info.Defs {
-		fmt.Printf("'%q' '%q' '%q' XXX", id.Name, object.Name(), object.Id())
+		if object != nil {
+			fmt.Printf("%q %q %q %q\n", id.Name, object.Name(), object.Id(), object.Type())
+		}
 	}
 }

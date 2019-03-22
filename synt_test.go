@@ -20,7 +20,10 @@ func TestLinterParseComments(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	actual := makePkgDesc(l.pkg, l.fs)
+	actual, err := makePkgDesc(l.pkg, l.fs)
+	if !a.NoError(err) {
+		return
+	}
 	expected := &pkgDesc{
 		types: map[string]*typeDesc{
 			"Type1": &typeDesc{
@@ -292,7 +295,7 @@ func TestFunc10(t *testing.T) {
 
 func TestFunc11(t *testing.T) {
 	expected := []error{
-	//&invalidStateError{object: "t.m", expected: 1, actual: 3, reason: "in call to func3_2"},
+		//&invalidStateError{object: "t.m", expected: 1, actual: 3, reason: "in call to func3_2"},
 	}
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func11")
 }
@@ -370,7 +373,10 @@ func makeLinter(path, pkg string) (*Linter, error) {
 }
 
 func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*syntChecker, error) {
-	desc := makePkgDesc(pkg, fs)
+	desc, err := makePkgDesc(pkg, fs)
+	if err != nil {
+		return nil, err
+	}
 	typeDesc, found := desc.types[typ]
 	if !found {
 		return nil, errors.Errorf("type %s not found", typ)
