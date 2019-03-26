@@ -97,7 +97,7 @@ func TestPrintFunc(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	func5Desc := sc.pkg.types["Type1"].methods["func5"]
+	func5Desc := sc.desc.types["Type1"].methods["func5"]
 	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
 	sc.check()
 	for _, rep := range sc.reports {
@@ -372,7 +372,7 @@ func makeLinter(path, pkg string) (*Linter, error) {
 	return New(fs, pkgAst), nil
 }
 
-func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*syntChecker, error) {
+func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*mutexChecker, error) {
 	desc, err := makePkgDesc(pkg, fs)
 	if err != nil {
 		return nil, err
@@ -385,7 +385,7 @@ func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*syn
 	if !found {
 		return nil, errors.Errorf("func %s not found", fun)
 	}
-	sc := newSyntChecker(desc, typ, fun)
+	sc := newMutexChecker(desc, typ, fun)
 	return sc, nil
 }
 

@@ -4,18 +4,19 @@ package synt
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type Linter struct {
-	fs  *token.FileSet
-	pkg *ast.Package
+	fs       *token.FileSet
+	pkgs     map[string]*ast.Package
+	checkers []string
 }
 
 type Report struct {
@@ -23,106 +24,96 @@ type Report struct {
 	Location string
 }
 
-type checkReport struct {
-	pos token.Pos
-	err error
-}
-
-func New(fs *token.FileSet, pkg *ast.Package) *Linter {
-	return &Linter{fs: fs, pkg: pkg}
-}
-
-func DoDir(name string) ([]Report, error) {
+func New(path string, checkers []string) (*Linter, error) {
 	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, name, notests, parser.ParseComments)
+	pkgs, err := parser.ParseDir(fs, path, notests, parser.ParseComments)
 	if err != nil {
 		return nil, err
 	}
-	var result []Report
-	var first error
-	for _, pkg := range pkgs {
-		if reports, err := New(fs, pkg).Do(); err == nil {
-			result = append(result, reports...)
-		} else if first == nil {
-			first = err
+	return &Linter{fs: fs, pkgs: pkgs}, nil
+}
+
+func DoDir(name string, checkers []string) ([]Report, error) {
+	l, err := New(name, checkers)
+	if err != nil {
+		return nil, err
+	}
+	return l.Do("")
+}
+
+func (l *Linter) Do(pkg string) (result []Report, firstErr error) {
+	checkers := makeCheckers(l.checkers)
+	if len(pkg) == 0 {
+		for name, pkg := range l.pkgs {
+			if reports, err := doPackage(pkg, l.fs, checkers); err != nil {
+				if firstErr == nil {
+					firstErr = errors.Wrapf(err, "error checking package %q", name)
+				}
+			} else {
+				result = append(result, reports...)
+			}
+		}
+	} else if pkg, found := l.pkgs[pkg]; found {
+		result, firstErr = doPackage(pkg, l.fs, checkers)
+	} else {
+		firstErr = errors.New("no such package")
+	}
+	return result, firstErr
+}
+
+func doPackage(pkg *ast.Package, fs *token.FileSet, checkers []Checker) ([]Report, error) {
+	var reports []CheckReport
+	info := &CheckInfo{
+		Pkg: pkg,
+		Fs:  fs,
+	}
+	for _, checker := range checkers {
+		if reps, err := checker.DoPackage(info); err == nil {
+			reports = append(reports, reps...)
+		} else {
+			return nil, err
 		}
 	}
-	return result, first
+	return checkReportsToReports(reports, fs), nil
 }
 
-func (l *Linter) Do() ([]Report, error) {
-	reports, err := checkPackage(l.pkg, l.fs)
-	if err != nil {
-		return nil, err
-	}
-	return checkReportsToReports(reports, l.fs), nil
-}
-
-func checkPackage(pkg *ast.Package, fs *token.FileSet) ([]checkReport, error) {
-	var reports []checkReport
-	desc, err := makePkgDesc(pkg, fs)
-	if err != nil {
-		return nil, err
-	}
-	for typName, typDesc := range desc.types {
-		for methodName := range typDesc.methods {
-			sc := newSyntChecker(desc, typName, methodName)
-			reports = append(reports, sc.check()...)
-		}
-	}
-	return reports, nil
-}
-
-func checkReportsToReports(reports []checkReport, fs *token.FileSet) []Report {
+func checkReportsToReports(reports []CheckReport, fs *token.FileSet) []Report {
 	sort.Slice(reports, func(i, j int) bool {
-		lhs, rhs := fs.Position(reports[i].pos), fs.Position(reports[j].pos)
+		lhs, rhs := fs.Position(reports[i].Pos), fs.Position(reports[j].Pos)
 		if lhs.Filename != rhs.Filename {
 			return lhs.Filename < rhs.Filename
 		}
-		return reports[i].pos < reports[j].pos
+		return reports[i].Pos < reports[j].Pos
 	})
 	var result []Report
 	for _, e := range reports {
 		result = append(result, Report{
-			Err:      e.err.Error(),
-			Location: fs.Position(e.pos).String(),
+			Err:      e.Err.Error(),
+			Location: fs.Position(e.Pos).String(),
 		})
 	}
 	return result
 }
 
-func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
-	var allNames []string
-	var allFiles []*ast.File
-	for name, file := range pkg.Files {
-		allNames = append(allNames, name)
-		allFiles = append(allFiles, file)
-	}
-	sort.Strings(allNames)
-	conf := types.Config{Importer: importer.Default()}
-	info := &types.Info{
-		Types:  make(map[ast.Expr]types.TypeAndValue),
-		Defs:   make(map[*ast.Ident]types.Object),
-		Uses:   make(map[*ast.Ident]types.Object),
-		Scopes: make(map[ast.Node]*types.Scope),
-	}
-	_, err := conf.Check(".", fs, allFiles, info)
-	if err != nil {
-		return nil, err
-	}
-	desc := &pkgDesc{
-		types:       make(map[string]*typeDesc),
-		globalFuncs: make(map[string]*methodDesc),
-		info:        info,
-	}
-	fv := &fileVisitor{desc}
-	for _, name := range allNames {
-		file := pkg.Files[name]
-		ast.Walk(fv, file)
-	}
-	return desc, nil
-}
-
 func notests(info os.FileInfo) bool {
 	return info.IsDir() || !strings.HasSuffix(info.Name(), "_test.go")
+}
+
+func makeCheckers(names []string) []Checker {
+	var result []Checker
+	for _, name := range names {
+		if ch := makeChecker(name); ch != nil {
+			result = append(result, ch)
+		}
+	}
+	return result
+}
+
+func makeChecker(name string) Checker {
+	switch name {
+	case "m":
+		return newMutexChecker()
+	default:
+		return nil
+	}
 }

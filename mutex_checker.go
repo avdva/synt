@@ -9,36 +9,41 @@ import (
 	"github.com/pkg/errors"
 )
 
-type syntChecker struct {
-	pkg               *pkgDesc
+type mutexChecker struct {
+	desc              *pkgDesc
 	typ               string
 	fun               string
 	branches          []stateChanger
-	state             *syntState
+	state             *mutState
 	method            *methodDesc
 	parsedAnnotations []annotation
 	stk               *stack
 	ourID             string
-	reports           []checkReport
+	reports           []CheckReport
 }
 
-func newSyntChecker(pkg *pkgDesc, typ, fun string) *syntChecker {
-	result := &syntChecker{
-		pkg:   pkg,
-		typ:   typ,
-		fun:   fun,
+func newMutexChecker() *mutexChecker {
+	return &mutexChecker{
 		stk:   newStack(&idGen{}),
-		state: newSyntState(),
+		state: newMutState(),
 	}
-	result.assignMethod()
-	result.buildObjects()
-	result.parsedAnnotations = parseAnnotations(result.method.annotations, result.stk)
-	return result
 }
 
-func (sc *syntChecker) assignMethod() {
+func (sc *mutexChecker) DoPackage(info *CheckInfo) ([]CheckReport, error) {
+	desc, err := makePkgDesc(info.Pkg, info.Fs)
+	if err != nil {
+		return nil, err
+	}
+	sc.desc = desc
+	sc.assignMethod()
+	sc.buildObjects()
+	sc.parsedAnnotations = parseAnnotations(sc.method.annotations, sc.stk)
+	return sc.check(), nil
+}
+
+func (sc *mutexChecker) assignMethod() {
 	if len(sc.typ) > 0 { // methods
-		if typDesc, found := sc.pkg.types[sc.typ]; found {
+		if typDesc, found := sc.desc.types[sc.typ]; found {
 			if md, found := typDesc.methods[sc.fun]; found {
 				sc.method = &md
 			}
@@ -50,24 +55,24 @@ func (sc *syntChecker) assignMethod() {
 	}
 }
 
-func (sc *syntChecker) buildObjects() {
+func (sc *mutexChecker) buildObjects() {
 	if sc.method.name.len() == 2 {
 		sc.stk.push()
 		sc.ourID = sc.stk.addObject(sc.method.name.first())
 	}
 }
 
-func (sc *syntChecker) check() []checkReport {
+func (sc *mutexChecker) check() []CheckReport {
 	fv := newFuncVisitor(sc, true)
 	fv.walk(sc.method.node)
 	return sc.reports
 }
 
-func (sc *syntChecker) newContext(node ast.Node) {
-	newSc := &syntChecker{
-		pkg:   sc.pkg,
+func (sc *mutexChecker) newContext(node ast.Node) {
+	newSc := &mutexChecker{
+		desc:  sc.desc,
 		typ:   sc.typ,
-		state: newSyntState(),
+		state: newMutState(),
 		method: &methodDesc{
 			name: sc.method.name,
 		},
@@ -78,13 +83,13 @@ func (sc *syntChecker) newContext(node ast.Node) {
 	sc.reports = append(sc.reports, newSc.reports...)
 }
 
-func (sc *syntChecker) branchStart(count int) []stateChanger {
+func (sc *mutexChecker) branchStart(count int) []stateChanger {
 	stks := sc.stk.branch(count)
 	for i := 0; i < count; i++ {
-		newSc := &syntChecker{
-			pkg:    sc.pkg,
+		newSc := &mutexChecker{
+			desc:   sc.desc,
 			typ:    sc.typ,
-			state:  copyState(sc.state),
+			state:  copyMutState(sc.state),
 			stk:    stks[i],
 			method: sc.method,
 		}
@@ -94,10 +99,10 @@ func (sc *syntChecker) branchStart(count int) []stateChanger {
 	return sc.branches
 }
 
-func (sc *syntChecker) branchEnd(results []visitResult) {
-	var states []*syntState
+func (sc *mutexChecker) branchEnd(results []visitResult) {
+	var states []*mutState
 	for i, result := range results {
-		bsc := sc.branches[i].(*syntChecker)
+		bsc := sc.branches[i].(*mutexChecker)
 		sc.reports = append(sc.reports, bsc.reports...)
 		if result.exitType == exitNormal {
 			states = append(states, bsc.state)
@@ -109,15 +114,15 @@ func (sc *syntChecker) branchEnd(results []visitResult) {
 	sc.branches = nil
 }
 
-func (sc *syntChecker) scopeStart() {
+func (sc *mutexChecker) scopeStart() {
 	sc.stk.push()
 }
 
-func (sc *syntChecker) scopeEnd() {
+func (sc *mutexChecker) scopeEnd() {
 	sc.stk.pop()
 }
 
-func (sc *syntChecker) newObject(name string, init dotExpr) {
+func (sc *mutexChecker) newObject(name string, init dotExpr) {
 
 	println("----------------")
 
@@ -146,17 +151,17 @@ func (sc *syntChecker) newObject(name string, init dotExpr) {
 	println("----------------")
 }
 
-func (sc *syntChecker) expr(op int, obj dotExpr, pos token.Pos) {
+func (sc *mutexChecker) expr(op int, obj dotExpr, pos token.Pos) {
 	switch op {
 	case exprExec:
 		errors := sc.onExec(obj)
 		for _, e := range errors {
-			sc.reports = append(sc.reports, checkReport{pos: pos, err: e})
+			sc.reports = append(sc.reports, CheckReport{Pos: pos, Err: e})
 		}
 	}
 }
 
-func (sc *syntChecker) onExec(obj dotExpr) []error {
+func (sc *mutexChecker) onExec(obj dotExpr) []error {
 	var result []error
 	sel := obj.selector()
 	objID := sc.stk.objectIDForExpr(sel)
@@ -199,7 +204,7 @@ func (sc *syntChecker) onExec(obj dotExpr) []error {
 	return result
 }
 
-func (sc *syntChecker) checkExec(obj dotExpr) []error {
+func (sc *mutexChecker) checkExec(obj dotExpr) []error {
 	objID := sc.stk.objectIDForExpr(obj.selector())
 	if len(objID) == 0 {
 		return nil
@@ -210,7 +215,7 @@ func (sc *syntChecker) checkExec(obj dotExpr) []error {
 	if len(sc.typ) == 0 { // TODO(avd) - add support for non-member funcs.
 		return nil
 	}
-	calee, found := sc.pkg.types[sc.typ].methods[obj.field().String()]
+	calee, found := sc.desc.types[sc.typ].methods[obj.field().String()]
 	if !found {
 		return []error{errors.Errorf("unknown method %s", obj.field())}
 	}
@@ -251,7 +256,7 @@ func (sc *syntChecker) checkExec(obj dotExpr) []error {
 	return result
 }
 
-func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err *invalidStateError) {
+func (sc *mutexChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, err *invalidStateError) {
 	caleeName := aCalee.obj.field().String()
 	if caleeName != "Lock" && caleeName != "RLock" {
 		return
@@ -278,7 +283,7 @@ func (sc *syntChecker) checkCallerAnnotation(aCalee annotation) (gotLock bool, e
 	return
 }
 
-func (sc *syntChecker) canLock(objID string) bool {
+func (sc *mutexChecker) canLock(objID string) bool {
 	for _, a := range sc.parsedAnnotations {
 		if a.obj.part(0) == objID && !a.not {
 			return false

@@ -158,19 +158,19 @@ type stateChange struct {
 	err   *invalidActError
 }
 
-type syntState struct {
+type mutState struct {
 	mut map[string]mutexState
 }
 
-func newSyntState() *syntState {
-	return &syntState{mut: make(map[string]mutexState)}
+func newMutState() *mutState {
+	return &mutState{mut: make(map[string]mutexState)}
 }
 
-func (ss *syntState) set(name string, state mutexState) {
+func (ss *mutState) set(name string, state mutexState) {
 	ss.mut[name] = state
 }
 
-func (ss *syntState) mutState(name string) (mutexState, bool) {
+func (ss *mutState) mutState(name string) (mutexState, bool) {
 	state, found := ss.mut[name]
 	if !found {
 		state = mutStateUnlocked
@@ -178,7 +178,7 @@ func (ss *syntState) mutState(name string) (mutexState, bool) {
 	return state, found
 }
 
-func (ss *syntState) stateChange(id string, act mutexAct) *invalidActError {
+func (ss *mutState) stateChange(id string, act mutexAct) *invalidActError {
 	old, _ := ss.mutState(id)
 	change := stateChangeTable[old][act]
 	ss.mut[id] = change.state
@@ -190,7 +190,7 @@ func (ss *syntState) stateChange(id string, act mutexAct) *invalidActError {
 	return &result
 }
 
-func (ss *syntState) ensureState(name string, state mutexState) *invalidStateError {
+func (ss *mutState) ensureState(name string, state mutexState) *invalidStateError {
 	curState, _ := ss.mutState(name)
 	if curState == state {
 		return nil
@@ -201,24 +201,24 @@ func (ss *syntState) ensureState(name string, state mutexState) *invalidStateErr
 	return &invalidStateError{object: name, actual: curState, expected: state}
 }
 
-func mergeStates(states []*syntState) *syntState {
+func mergeStates(states []*mutState) *mutState {
 	allNames := make(map[string]struct{})
 	for _, state := range states {
 		for k := range state.mut {
 			allNames[k] = struct{}{}
 		}
 	}
-	newState := newSyntState()
+	newState := newMutState()
 	for name := range allNames {
 		resultState := mutStateUnknown
 		for _, state := range states {
-			stateFromBranch, _ := state.mutState(name)
+			objState, _ := state.mutState(name)
 			if resultState == mutStateUnknown {
-				resultState = stateFromBranch
+				resultState = objState
 				continue
 			}
-			if resultState != stateFromBranch {
-				resultState = stateMergeTable[resultState][stateFromBranch]
+			if resultState != objState {
+				resultState = stateMergeTable[resultState][objState]
 			}
 		}
 		newState.set(name, resultState)
@@ -226,8 +226,8 @@ func mergeStates(states []*syntState) *syntState {
 	return newState
 }
 
-func copyState(st *syntState) *syntState {
-	result := newSyntState()
+func copyMutState(st *mutState) *mutState {
+	result := newMutState()
 	for k, v := range st.mut {
 		result.mut[k] = v
 	}

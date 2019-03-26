@@ -4,7 +4,10 @@ package synt
 
 import (
 	"go/ast"
+	"go/importer"
+	"go/token"
 	"go/types"
+	"sort"
 	"strings"
 )
 
@@ -90,6 +93,38 @@ type pkgDesc struct {
 	info        *types.Info
 	types       map[string]*typeDesc
 	globalFuncs map[string]*methodDesc
+}
+
+func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
+	var allNames []string
+	var allFiles []*ast.File
+	for name, file := range pkg.Files {
+		allNames = append(allNames, name)
+		allFiles = append(allFiles, file)
+	}
+	sort.Strings(allNames)
+	conf := types.Config{Importer: importer.Default()}
+	info := &types.Info{
+		Types:  make(map[ast.Expr]types.TypeAndValue),
+		Defs:   make(map[*ast.Ident]types.Object),
+		Uses:   make(map[*ast.Ident]types.Object),
+		Scopes: make(map[ast.Node]*types.Scope),
+	}
+	_, err := conf.Check(".", fs, allFiles, info)
+	if err != nil {
+		return nil, err
+	}
+	desc := &pkgDesc{
+		types:       make(map[string]*typeDesc),
+		globalFuncs: make(map[string]*methodDesc),
+		info:        info,
+	}
+	fv := &fileVisitor{desc}
+	for _, name := range allNames {
+		file := pkg.Files[name]
+		ast.Walk(fv, file)
+	}
+	return desc, nil
 }
 
 func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
