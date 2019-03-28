@@ -11,91 +11,43 @@ import (
 	"strings"
 )
 
-type dotExpr struct {
-	parts []string
-}
-
-func dotExprFromParts(parts ...string) dotExpr {
-	return dotExpr{parts: parts}
-}
-
-func (i dotExpr) String() string {
-	return strings.Join(i.parts, ".")
-}
-
-func (i dotExpr) len() int {
-	return len(i.parts)
-}
-
-func (i dotExpr) part(idx int) string {
-	return i.parts[idx]
-}
-
-func (i dotExpr) eq(other dotExpr) bool {
-	if len(i.parts) != len(other.parts) {
-		return false
-	}
-	for i, p := range i.parts {
-		if p != other.parts[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (i *dotExpr) field() dotExpr {
-	return dotExpr{parts: []string{i.parts[len(i.parts)-1]}}
-}
-
-func (i dotExpr) selector() dotExpr {
-	return dotExpr{parts: i.parts[:len(i.parts)-1]}
-}
-
-func (i dotExpr) first() dotExpr {
-	return dotExpr{parts: []string{i.parts[0]}}
-}
-
-func (i dotExpr) copy() dotExpr {
-	return dotExprFromParts(i.parts...)
-}
-
-func (i dotExpr) set(idx int, part string) {
-	i.parts[idx] = part
-}
-
-func (i *dotExpr) append(part string) {
-	i.parts = append(i.parts, part)
-}
-
 type annotation struct {
 	obj dotExpr
 	not bool
 }
 
-type methodDesc struct {
+type methodDef struct {
 	node        ast.Node
 	name        dotExpr
 	annotations []annotation
 }
 
-type fieldDesc struct {
+type varDef struct {
 	node        ast.Node
 	annotations []annotation
 }
 
-type typeDesc struct {
+type typeDef struct {
 	expr    ast.Expr
-	methods map[string]methodDesc
-	fields  map[string]fieldDesc
+	methods map[string]methodDef
+	fields  map[string]varDef
 }
 
-type pkgDesc struct {
-	info        *types.Info
-	types       map[string]*typeDesc
-	globalFuncs map[string]*methodDesc
+type scopeDefs struct {
+	types     map[string]*typeDef
+	functions map[string]*methodDef
+	vars      map[string]*varDef
 }
 
-func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
+func newScopeDefs() *scopeDefs {
+	return &scopeDefs{
+		types:     make(map[string]*typeDef),
+		functions: make(map[string]*methodDef),
+		vars:      make(map[string]*varDef),
+	}
+}
+
+func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*scopeDefs, error) {
 	var allNames []string
 	var allFiles []*ast.File
 	for name, file := range pkg.Files {
@@ -114,12 +66,11 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
 	if err != nil {
 		return nil, err
 	}
-	desc := &pkgDesc{
-		types:       make(map[string]*typeDesc),
-		globalFuncs: make(map[string]*methodDesc),
-		info:        info,
+	desc := &scopeDefs{
+		types:     make(map[string]*typeDef),
+		functions: make(map[string]*methodDef),
 	}
-	fv := &fileVisitor{desc}
+	fv := &scopeVisitor{}
 	for _, name := range allNames {
 		file := pkg.Files[name]
 		ast.Walk(fv, file)
@@ -127,10 +78,24 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
 	return desc, nil
 }
 
-func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
+func (d *scopeDefs) addFuncDecl(node *ast.FuncDecl) {
 	if node.Recv == nil {
-		return
+		d.addFunc(node)
+	} else {
+		d.addMethod(node)
 	}
+}
+
+func (d *scopeDefs) addFunc(node *ast.FuncDecl) {
+	annotations := parseComments(node.Doc)
+	d.functions[node.Name.Name] = &methodDef{
+		node:        node,
+		name:        dotExprFromParts(node.Name.Name),
+		annotations: annotations,
+	}
+}
+
+func (d *scopeDefs) addMethod(node *ast.FuncDecl) {
 	var typName string
 	annotations := parseComments(node.Doc)
 	recv := node.Recv.List[0]
@@ -142,40 +107,48 @@ func (d *pkgDesc) addFuncDecl(node *ast.FuncDecl) {
 		typName = rec.Name
 	}
 	td := d.descForType(typName)
-	td.methods[node.Name.Name] = methodDesc{
+	td.methods[node.Name.Name] = methodDef{
 		node:        node,
 		name:        dotExprFromParts(recv.Names[0].Name, node.Name.Name),
 		annotations: annotations,
 	}
 }
 
-func (d *pkgDesc) descForType(typName string) *typeDesc {
+func (d *scopeDefs) descForType(typName string) *typeDef {
 	td := d.types[typName]
 	if td == nil {
-		td = &typeDesc{
-			methods: make(map[string]methodDesc),
-			fields:  make(map[string]fieldDesc),
+		td = &typeDef{
+			methods: make(map[string]methodDef),
+			fields:  make(map[string]varDef),
 		}
 		d.types[typName] = td
 	}
 	return td
 }
 
-func (d *pkgDesc) addTypeSpec(node *ast.TypeSpec) {
+func (d *scopeDefs) addTypeSpec(node *ast.TypeSpec) {
 	switch typed := node.Type.(type) {
 	case *ast.StructType:
 		td := d.descForType(node.Name.Name)
-		//		td.expr = node
 		if typed.Fields == nil || len(typed.Fields.List) == 0 {
 			return
 		}
 		for _, field := range typed.Fields.List {
 			for _, name := range field.Names {
-				td.fields[name.Name] = fieldDesc{
+				td.fields[name.Name] = varDef{
 					node:        field,
 					annotations: parseComments(field.Doc),
 				}
 			}
+		}
+	}
+}
+
+func (d *scopeDefs) addValueSpec(node *ast.ValueSpec) {
+	for _, name := range node.Names {
+		d.vars[name.Name] = &varDef{
+			node:        name,
+			annotations: parseComments(node.Doc),
 		}
 	}
 }

@@ -3,7 +3,6 @@
 package synt
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,13 +10,6 @@ import (
 
 func TestLinterParsePackage(t *testing.T) {
 	r := require.New(t)
-	l, err := makeLinter("./testdata/pkg0", "main")
+	_, err := New("./testdata/pkg0", []string{"m"})
 	r.NoError(err)
-	desc, err := makePkgDesc(l.pkg, l.fs)
-	r.NoError(err)
-	for id, object := range desc.info.Defs {
-		if object != nil {
-			fmt.Printf("%q %q %q %q\n", id.Name, object.Name(), object.Id(), object.Type())
-		}
-	}
 }

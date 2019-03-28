@@ -4,10 +4,6 @@ package synt
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -16,93 +12,75 @@ import (
 
 func TestLinterParseComments(t *testing.T) {
 	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
+	l, err := New("./test/pkg1", []string{"m"})
 	if !a.NoError(err) {
 		return
 	}
-	actual, err := makePkgDesc(l.pkg, l.fs)
+	actual, err := makePkgDesc(l.pkgs["pkg1"], l.fs)
 	if !a.NoError(err) {
 		return
 	}
-	expected := &pkgDesc{
-		types: map[string]*typeDesc{
-			"Type1": &typeDesc{
-				methods: map[string]methodDesc{
-					"func1": methodDesc{
+	expected := &scopeDefs{
+		types: map[string]*typeDef{
+			"Type1": &typeDef{
+				methods: map[string]methodDef{
+					"func1": methodDef{
 						annotations: []annotation{
 							annotation{obj: dotExprFromParts("t", "m", "Lock"), not: true},
 						},
 					},
-					"func2": methodDesc{
+					"func2": methodDef{
 						annotations: []annotation{
 							annotation{obj: dotExprFromParts("t", "m", "Lock")},
 						},
 					},
-					"func3": methodDesc{
+					"func3": methodDef{
 						annotations: []annotation{
 							annotation{obj: dotExprFromParts("t", "m", "RLock")},
 							annotation{obj: dotExprFromParts("t", "mut", "Lock")},
 						},
 					},
-					"func3_1": methodDesc{},
-					"func3_2": methodDesc{
+					"func3_1": methodDef{},
+					"func3_2": methodDef{
 						annotations: []annotation{
 							annotation{obj: dotExprFromParts("t", "m", "Lock")},
 						},
 					},
-					"func3_3": methodDesc{},
-					"func3_4": methodDesc{
+					"func3_3": methodDef{},
+					"func3_4": methodDef{
 						annotations: []annotation{
 							annotation{obj: dotExprFromParts("t", "m", "RLock")},
 						},
 					},
-					"func3_5": methodDesc{},
-					"func3_6": methodDesc{},
-					"func4":   methodDesc{},
-					"func5":   methodDesc{},
-					"func6":   methodDesc{},
-					"func7":   methodDesc{},
-					"func8":   methodDesc{},
-					"func10":  methodDesc{},
-					"func11":  methodDesc{},
-					"func12":  methodDesc{},
-					"func13":  methodDesc{},
-					"func14":  methodDesc{},
-					"func15":  methodDesc{},
-					"getM":    methodDesc{},
-					"self":    methodDesc{},
+					"func3_5": methodDef{},
+					"func3_6": methodDef{},
+					"func4":   methodDef{},
+					"func5":   methodDef{},
+					"func6":   methodDef{},
+					"func7":   methodDef{},
+					"func8":   methodDef{},
+					"func10":  methodDef{},
+					"func11":  methodDef{},
+					"func12":  methodDef{},
+					"func13":  methodDef{},
+					"func14":  methodDef{},
+					"func15":  methodDef{},
+					"getM":    methodDef{},
+					"self":    methodDef{},
 				},
 			},
-			"Type2": &typeDesc{
-				methods: map[string]methodDesc{},
+			"Type2": &typeDef{
+				methods: map[string]methodDef{},
 			},
-			"Type3": &typeDesc{
-				methods: map[string]methodDesc{},
+			"Type3": &typeDef{
+				methods: map[string]methodDef{},
 			},
-			"EmptyType": &typeDesc{
-				methods: map[string]methodDesc{},
+			"EmptyType": &typeDef{
+				methods: map[string]methodDef{},
 			},
 		},
 	}
 	a.NoError(comparePkgDesc(expected, actual))
-}
-
-func TestPrintFunc(t *testing.T) {
-	a := assert.New(t)
-	l, err := makeLinter("./test/pkg1", "pkg1")
-	if !a.NoError(err) {
-		return
-	}
-	sc, err := makeSyntChecker(l.pkg, l.fs, "Type1", "func5")
-	if !a.NoError(err) {
-		return
-	}
-	func5Desc := sc.desc.types["Type1"].methods["func5"]
-	ast.Walk(&printVisitor{w: os.Stdout}, func5Desc.node)
-	sc.check()
-	for _, rep := range sc.reports {
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
-	}
 }
 
 func TestFunc3(t *testing.T) {
@@ -341,55 +319,21 @@ func TestCandle(t *testing.T) {
 
 func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {
 	a := assert.New(t)
-	l, err := makeLinter(path, pkg)
+	l, err := New("./test/pkg1", []string{"m"})
 	if !a.NoError(err) {
 		return
 	}
-	sc, err := makeSyntChecker(l.pkg, l.fs, typ, fun)
-	if !a.NoError(err) {
-		return
-	}
-	sc.check()
+	sc := newMutexChecker()
 	if !a.Equal(len(expected), len(sc.reports)) {
 		return
 	}
 	for i, rep := range sc.reports {
-		a.Equal(expected[i], rep.err)
-		println(fmt.Sprintf("%s: %s", rep.err, l.fs.Position(rep.pos).String()))
+		a.Equal(expected[i], rep.Err)
+		println(fmt.Sprintf("%s: %s", rep.Err, l.fs.Position(rep.Pos).String()))
 	}
 }
 
-func makeLinter(path, pkg string) (*Linter, error) {
-	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, path, nil, parser.ParseComments)
-	if err != nil {
-		return nil, err
-	}
-	pkgAst, found := pkgs[pkg]
-	if !found {
-		return nil, errors.Errorf("package %s not found", pkg)
-	}
-	return New(fs, pkgAst), nil
-}
-
-func makeSyntChecker(pkg *ast.Package, fs *token.FileSet, typ, fun string) (*mutexChecker, error) {
-	desc, err := makePkgDesc(pkg, fs)
-	if err != nil {
-		return nil, err
-	}
-	typeDesc, found := desc.types[typ]
-	if !found {
-		return nil, errors.Errorf("type %s not found", typ)
-	}
-	_, found = typeDesc.methods[fun]
-	if !found {
-		return nil, errors.Errorf("func %s not found", fun)
-	}
-	sc := newMutexChecker(desc, typ, fun)
-	return sc, nil
-}
-
-func comparePkgDesc(expected, actual *pkgDesc) error {
+func comparePkgDesc(expected, actual *scopeDefs) error {
 	if len(expected.types) != len(actual.types) {
 		return errors.Errorf("types count mismatch, expected %d, got %d", len(expected.types), len(actual.types))
 	}
@@ -403,7 +347,7 @@ func comparePkgDesc(expected, actual *pkgDesc) error {
 	return nil
 }
 
-func compareTypeDesc(expected, actual *typeDesc) error {
+func compareTypeDesc(expected, actual *typeDef) error {
 	if len(expected.methods) != len(actual.methods) {
 		return errors.Errorf("methods count mismatch, expected %d, got %d", len(expected.methods), len(actual.methods))
 	}
@@ -417,7 +361,7 @@ func compareTypeDesc(expected, actual *typeDesc) error {
 	return nil
 }
 
-func compareMethodDesc(expected, actual *methodDesc) error {
+func compareMethodDesc(expected, actual *methodDef) error {
 	if len(expected.annotations) != len(actual.annotations) {
 		return errors.Errorf("expected %d, got %d annotations", len(expected.annotations), len(actual.annotations))
 	}
