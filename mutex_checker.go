@@ -20,7 +20,7 @@ func (sc *mutexChecker) DoPackage(info *CheckInfo) ([]CheckReport, error) {
 	return nil, nil
 }
 
-func (mc *mutexChecker) checkGlobals(desc *scopeDefs) []CheckReport {
+func (mc *mutexChecker) checkGlobals(defs *scopeDefs) []CheckReport {
 
 	return nil
 }

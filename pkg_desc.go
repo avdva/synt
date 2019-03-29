@@ -17,8 +17,8 @@ type annotation struct {
 }
 
 type methodDef struct {
-	node        ast.Node
-	name        dotExpr
+	node ast.Node
+	//name        dotExpr
 	annotations []annotation
 }
 
@@ -70,10 +70,10 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*scopeDefs, error) {
 		types:     make(map[string]*typeDef),
 		functions: make(map[string]*methodDef),
 	}
-	fv := &scopeVisitor{}
+	sv := newScopeVisitor()
 	for _, name := range allNames {
 		file := pkg.Files[name]
-		ast.Walk(fv, file)
+		ast.Walk(sv, file)
 	}
 	return desc, nil
 }
@@ -90,7 +90,6 @@ func (d *scopeDefs) addFunc(node *ast.FuncDecl) {
 	annotations := parseComments(node.Doc)
 	d.functions[node.Name.Name] = &methodDef{
 		node:        node,
-		name:        dotExprFromParts(node.Name.Name),
 		annotations: annotations,
 	}
 }
@@ -109,7 +108,6 @@ func (d *scopeDefs) addMethod(node *ast.FuncDecl) {
 	td := d.descForType(typName)
 	td.methods[node.Name.Name] = methodDef{
 		node:        node,
-		name:        dotExprFromParts(recv.Names[0].Name, node.Name.Name),
 		annotations: annotations,
 	}
 }
@@ -127,9 +125,9 @@ func (d *scopeDefs) descForType(typName string) *typeDef {
 }
 
 func (d *scopeDefs) addTypeSpec(node *ast.TypeSpec) {
+	td := d.descForType(node.Name.Name)
 	switch typed := node.Type.(type) {
 	case *ast.StructType:
-		td := d.descForType(node.Name.Name)
 		if typed.Fields == nil || len(typed.Fields.List) == 0 {
 			return
 		}

@@ -7,7 +7,13 @@ import (
 )
 
 type scopeVisitor struct {
-	defs scopeDefs
+	defs *scopeDefs
+}
+
+func newScopeVisitor() *scopeVisitor {
+	return &scopeVisitor{
+		defs: newScopeDefs(),
+	}
 }
 
 func (sv *scopeVisitor) Visit(node ast.Node) ast.Visitor {

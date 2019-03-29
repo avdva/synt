@@ -3,25 +3,49 @@
 package synt
 
 import (
-	"fmt"
 	"go/ast"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestScopeVisitor(t *testing.T) {
-	a := assert.New(t)
+	r := require.New(t)
 	l, err := New("./testdata/pkg0", []string{"m"})
-	if !a.NoError(err) {
-		return
-	}
+	r.NoError(err)
 	pkg := l.pkgs["main"]
-	a.NotNil(pkg)
-	fv := &scopeVisitor{defs: *newScopeDefs()}
+	r.NotNil(pkg)
+	fv := newScopeVisitor()
 	for _, file := range pkg.Files {
 		ast.Walk(fv, file)
 	}
-	fmt.Printf("%+v\n%+v\n%+v\n", fv.defs.vars, fv.defs.functions, fv.defs.types)
-	fmt.Printf("%+v", fv.defs.vars["b"].annotations)
+	zeroAstNodes(fv.defs)
+	expected := &scopeDefs{
+		vars: map[string]*varDef{
+			"a": &varDef{},
+			"b": &varDef{annotations: []annotation{{obj: dotExprFromParts("m", "Lock")}}},
+			"c": &varDef{annotations: []annotation{{obj: dotExprFromParts("m", "Lock")}}},
+			"m": &varDef{},
+			"n": &varDef{},
+		},
+		functions: map[string]*methodDef{
+			"init":     &methodDef{},
+			"main":     &methodDef{},
+			"someFunc": &methodDef{},
+		},
+		types: map[string]*typeDef{},
+	}
+	r.Equal(expected.vars, fv.defs.vars)
+}
+
+func zeroAstNodes(defs *scopeDefs) {
+	for _, def := range defs.functions {
+		def.node = nil
+	}
+	for _, def := range defs.types {
+		def.expr = nil
+	}
+	for _, def := range defs.vars {
+		def.node = nil
+	}
 }
