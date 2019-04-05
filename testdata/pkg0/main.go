@@ -19,11 +19,17 @@ func init() {
 }
 
 func someFunc() {
+	loc := 0
+	_ = loc
 	m.Lock()
 	b = 0
 	fmt.Println(b)
 	m.Unlock()
 	c = 0
+	localFunc := func() {
+
+	}
+	localFunc()
 }
 
 func main() {

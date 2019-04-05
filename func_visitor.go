@@ -38,8 +38,7 @@ type visitResult struct {
 	exitType int
 }
 
-type visitContext struct {
-}
+type visitContext struct{}
 
 type funcVisitor struct {
 	vc   *visitContext

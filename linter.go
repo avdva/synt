@@ -30,7 +30,7 @@ func New(path string, checkers []string) (*Linter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Linter{fs: fs, pkgs: pkgs}, nil
+	return &Linter{fs: fs, pkgs: pkgs, checkers: checkers}, nil
 }
 
 func DoDir(name string, checkers []string) ([]Report, error) {
@@ -43,6 +43,7 @@ func DoDir(name string, checkers []string) ([]Report, error) {
 
 func (l *Linter) Do(pkg string) (result []Report, firstErr error) {
 	checkers := makeCheckers(l.checkers)
+
 	if len(pkg) == 0 {
 		for name, pkg := range l.pkgs {
 			if reports, err := doPackage(pkg, l.fs, checkers); err != nil {
@@ -113,6 +114,8 @@ func makeChecker(name string) Checker {
 	switch name {
 	case "m":
 		return newMutexChecker()
+	case "mstate":
+		return newLockerStateChecker([]string{"sync.Mutex"})
 	default:
 		return nil
 	}

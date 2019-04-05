@@ -15,12 +15,13 @@ func TestScopeVisitor(t *testing.T) {
 	r.NoError(err)
 	pkg := l.pkgs["main"]
 	r.NotNil(pkg)
-	fv := newScopeVisitor()
+	fv := newDefsVisitor()
 	for _, file := range pkg.Files {
 		ast.Walk(fv, file)
 	}
+	makePkgDesc(pkg, l.fs)
 	zeroAstNodes(fv.defs)
-	expected := &scopeDefs{
+	expected := &defs{
 		vars: map[string]*varDef{
 			"a": &varDef{},
 			"b": &varDef{annotations: []annotation{{obj: dotExprFromParts("m", "Lock")}}},
@@ -38,7 +39,7 @@ func TestScopeVisitor(t *testing.T) {
 	r.Equal(expected.vars, fv.defs.vars)
 }
 
-func zeroAstNodes(defs *scopeDefs) {
+func zeroAstNodes(defs *defs) {
 	for _, def := range defs.functions {
 		def.node = nil
 	}

@@ -11,16 +11,16 @@ func newMutexChecker() *mutexChecker {
 }
 
 func (sc *mutexChecker) DoPackage(info *CheckInfo) ([]CheckReport, error) {
-	desc, err := makePkgDesc(info.Pkg, info.Fs)
+	_, err := makePkgDesc(info.Pkg, info.Fs)
 	if err != nil {
 		return nil, err
 	}
 	var results []CheckReport
-	results = append(results, sc.checkGlobals(desc)...)
+	results = append(results, sc.checkGlobals(nil)...)
 	return nil, nil
 }
 
-func (mc *mutexChecker) checkGlobals(defs *scopeDefs) []CheckReport {
+func (mc *mutexChecker) checkGlobals(defs *defs) []CheckReport {
 
 	return nil
 }

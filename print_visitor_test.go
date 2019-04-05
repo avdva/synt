@@ -71,7 +71,7 @@ func (fv *printVisitor) Visit(node ast.Node) ast.Visitor {
 	return fv
 }
 
-func debugPrintPkgDesc(desc *scopeDefs) {
+func debugPrintPkgDesc(desc *defs) {
 	for name, td := range desc.types {
 		fmt.Printf("type %s\n", name)
 		for name, f := range td.fields {

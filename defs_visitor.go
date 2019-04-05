@@ -6,17 +6,17 @@ import (
 	"go/ast"
 )
 
-type scopeVisitor struct {
-	defs *scopeDefs
+type defsVisitor struct {
+	defs *defs
 }
 
-func newScopeVisitor() *scopeVisitor {
-	return &scopeVisitor{
-		defs: newScopeDefs(),
+func newDefsVisitor() *defsVisitor {
+	return &defsVisitor{
+		defs: newDefs(),
 	}
 }
 
-func (sv *scopeVisitor) Visit(node ast.Node) ast.Visitor {
+func (sv *defsVisitor) Visit(node ast.Node) ast.Visitor {
 	switch typed := node.(type) {
 	case *ast.FuncDecl:
 		sv.defs.addFuncDecl(typed)

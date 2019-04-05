@@ -16,11 +16,8 @@ func TestLinterParseComments(t *testing.T) {
 	if !a.NoError(err) {
 		return
 	}
-	actual, err := makePkgDesc(l.pkgs["pkg1"], l.fs)
-	if !a.NoError(err) {
-		return
-	}
-	expected := &scopeDefs{
+	actual := buildDefs(l.pkgs["pkg1"].Files)
+	expected := &defs{
 		types: map[string]*typeDef{
 			"Type1": &typeDef{
 				methods: map[string]methodDef{
@@ -333,7 +330,7 @@ func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {
 	}
 }
 
-func comparePkgDesc(expected, actual *scopeDefs) error {
+func comparePkgDesc(expected, actual *defs) error {
 	if len(expected.types) != len(actual.types) {
 		return errors.Errorf("types count mismatch, expected %d, got %d", len(expected.types), len(actual.types))
 	}
