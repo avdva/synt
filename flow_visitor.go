@@ -19,6 +19,19 @@ func buildFlow(stmt *ast.BlockStmt) flow {
 	for _, st := range stmt.List {
 		switch typed := st.(type) {
 		case *ast.IfStmt:
+			if len(fn.branches) > 0 || len(fn.statements) > 0 {
+				result = append(result, fn)
+			}
+			fn = flowNode{}
+			if typed.Init != nil {
+				fn.statements = append(fn.statements, typed.Init)
+			}
+			ifFlow := flow{
+				{statements: []ast.Stmt{&ast.ExprStmt{X: typed.Cond}}},
+			}
+			fn.branches = []flow{
+				ifFlow,
+			}
 		case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.GoStmt, *ast.SelectStmt, *ast.RangeStmt:
 		case *ast.BlockStmt:
 			if len(fn.branches) > 0 || len(fn.statements) > 0 {
