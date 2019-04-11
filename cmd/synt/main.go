@@ -21,7 +21,7 @@ func main() {
 	}
 	for _, name := range toParse {
 		if fi, err := os.Stat(name); err == nil && fi.IsDir() {
-			if rep, err := synt.DoDir(name); err == nil {
+			if rep, err := synt.DoDir(name, []string{"mstate"}); err == nil {
 				reports = append(reports, rep...)
 			} else {
 				log.Warnf("'%s' parse error: %v", name, err)

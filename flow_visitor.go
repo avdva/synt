@@ -6,11 +6,37 @@ import (
 	"go/ast"
 )
 
+type flow []flowNode
+
 type flowNode struct {
 	statements []ast.Stmt
-	branches   []*flowNode
+	branches   []flow
 }
 
-type flowVisitor struct {
-	nodes []*flowNode
+func buildFlow(stmt *ast.BlockStmt) flow {
+	var fn flowNode
+	var result flow
+	for _, st := range stmt.List {
+		switch typed := st.(type) {
+		case *ast.IfStmt:
+		case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.GoStmt, *ast.SelectStmt, *ast.RangeStmt:
+		case *ast.BlockStmt:
+			if len(fn.branches) > 0 || len(fn.statements) > 0 {
+				result = append(result, fn)
+			}
+			result = append(result, flowNode{branches: []flow{buildFlow(typed)}})
+		case *ast.DeferStmt:
+		default:
+			if len(fn.branches) == 0 {
+				fn.statements = append(fn.statements, st)
+			} else {
+				result = append(result, fn)
+				fn = flowNode{statements: []ast.Stmt{st}}
+			}
+		}
+	}
+	if len(fn.branches) > 0 || len(fn.statements) > 0 {
+		result = append(result, fn)
+	}
+	return result
 }

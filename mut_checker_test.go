@@ -85,7 +85,7 @@ func TestFunc3(t *testing.T) {
 		&invalidActError{
 			subject: "func3",
 			object:  "t.m",
-			action:  mutActLock,
+			action:  lkActLock,
 			reason:  "annotation",
 		},
 	}
@@ -96,14 +96,14 @@ func TestFunc3_1(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateR,
-			actual:   mutStateUnlocked,
+			expected: lkStateR,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 		&invalidStateError{
 			object:   "t.mut",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 	}
@@ -114,8 +114,8 @@ func TestFunc3_3(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateL,
-			actual:   mutStateR,
+			expected: lkStateL,
+			actual:   lkStateR,
 			reason:   "in call to func3_2",
 		},
 	}
@@ -126,8 +126,8 @@ func TestFunc3_3_1(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t1.m",
-			expected: mutStateL,
-			actual:   mutStateR,
+			expected: lkStateL,
+			actual:   lkStateR,
 			reason:   "in call to func3_2",
 		},
 	}
@@ -138,8 +138,8 @@ func TestFunc3_4(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateL,
-			actual:   mutStateR,
+			expected: lkStateL,
+			actual:   lkStateR,
 		},
 	}
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func3_4")
@@ -150,13 +150,13 @@ func TestFunc3_5(t *testing.T) {
 		&invalidActError{
 			subject: "",
 			object:  "t.m",
-			action:  mutActRUnlock,
+			action:  lkActRUnlock,
 			reason:  "not locked",
 		},
 		&invalidActError{
 			subject: "",
 			object:  "t.m",
-			action:  mutActUnlock,
+			action:  lkActUnlock,
 			reason:  "not locked",
 		},
 	}
@@ -168,7 +168,7 @@ func TestFunc3_6(t *testing.T) {
 		&invalidActError{
 			subject: "",
 			object:  "t.m",
-			action:  mutActUnlock,
+			action:  lkActUnlock,
 			reason:  "not locked",
 		},
 	}
@@ -179,38 +179,38 @@ func TestFunc6(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func1",
 		},
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3_2",
 		},
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateR,
-			actual:   mutStateUnlocked,
+			expected: lkStateR,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 		&invalidStateError{
 			object:   "t.mut",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 		&invalidStateError{
 			object:   "t.m",
-			expected: mutStateR,
-			actual:   mutStateUnlocked,
+			expected: lkStateR,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 		&invalidStateError{
 			object:   "t.mut",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 	}
@@ -221,8 +221,8 @@ func TestFunc7(t *testing.T) {
 	expected := []error{
 		&invalidStateError{
 			object:   "t.mut",
-			expected: mutStateL,
-			actual:   mutStateUnlocked,
+			expected: lkStateL,
+			actual:   lkStateUnlocked,
 			reason:   "in call to func3",
 		},
 	}
@@ -234,19 +234,19 @@ func TestFunc8(t *testing.T) {
 		&invalidActError{
 			subject: "",
 			object:  "t.m",
-			action:  mutActLock,
+			action:  lkActLock,
 			reason:  "already locked",
 		},
 		&invalidStateError{
 			object:   "t.m",
 			expected: 2,
-			actual:   mutStateMayLR,
+			actual:   lkStateMayLR,
 			reason:   "in call to func3_4",
 		},
 		&invalidActError{
 			subject: "",
 			object:  "t.m",
-			action:  mutActUnlock,
+			action:  lkActUnlock,
 			reason:  "?rwlocked",
 		},
 	}

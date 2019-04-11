@@ -14,3 +14,10 @@ func TestLockerStateChecker(t *testing.T) {
 	r.NoError(err)
 	l.Do("")
 }
+
+func TestLockerStateChecker2(t *testing.T) {
+	r := require.New(t)
+	l, err := New("./testdata/pkg1", []string{"mstate"})
+	r.NoError(err)
+	l.Do("")
+}

@@ -9,10 +9,6 @@ import (
 )
 
 const (
-	exprRead = iota
-	exprWrite
-	exprExec
-
 	exitNormal = 0
 	exitReturn = 1
 	exitPanic  = 2
@@ -157,7 +153,7 @@ func (fv *funcVisitor) handleCall(expr ast.Node) {
 		if cid.String() == "panic" {
 			fv.vr.exitType = exitPanic
 		}
-		fv.sc.expr(exprExec, cid, cv.callPosAt(cid.len()-1))
+		//		fv.sc.expr(opExec, cid, cv.callPosAt(cid.len()-1))
 	}
 }
 
@@ -245,7 +241,7 @@ func (sm *simpleVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(sm, arg)
 		}
 		if expanded := expandCall(typed.Fun); expanded != nil {
-			sm.sc.expr(exprExec, dotExprFromParts(expanded...), typed.Pos())
+			//			sm.sc.expr(opExec, dotExprFromParts(expanded...), typed.Pos())
 		}
 	case *ast.AssignStmt:
 	case *ast.IncDecStmt:

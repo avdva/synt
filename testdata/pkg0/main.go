@@ -29,6 +29,9 @@ func someFunc() {
 	localFunc := func() {
 
 	}
+	func() {
+
+	}()
 	localFunc()
 }
 

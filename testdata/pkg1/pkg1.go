@@ -49,5 +49,8 @@ func (t *Type1) self(arg int) *Type1 {
 }
 
 func freeFunc() {
-
+	var t Type1
+	t.getM().Lock()
+	t.m.Lock()
+	defer t.m.Unlock()
 }

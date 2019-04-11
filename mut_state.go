@@ -5,116 +5,121 @@ package synt
 import "fmt"
 
 const (
-	mutStateUnknown = mutexState(iota)
-	mutStateUnlocked
-	mutStateL
-	mutStateR
-	mutStateMayL
-	mutStateMayR
-	mutStateMayLR
+	lkStateUnknown = lockerState(iota)
+	lkStateUnlocked
+	lkStateL
+	lkStateR
+	lkStateMayL
+	lkStateMayR
+	lkStateMayLR
 )
 
 const (
-	mutActLock = mutexAct(iota)
-	mutActRLock
-	mutActUnlock
-	mutActRUnlock
+	lkActLock = lockerAct(iota)
+	lkActRLock
+	lkActUnlock
+	lkActRUnlock
 )
 
 var (
-	// stateChangeTable shows how mutex state changes in response to mutex actions.
+	// stateChangeTable shows how locker state changes in response to lock/unlock actions.
 	stateChangeTable = [][]stateChange{
 		[]stateChange{ // state is Unlocked
-			stateChange{state: mutStateL, err: nil},
-			stateChange{state: mutStateR, err: nil},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "not locked"}},
+			stateChange{final: lkStateL, err: nil},
+			stateChange{final: lkStateR, err: nil},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "not locked"}},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "not locked"}},
 		},
 		[]stateChange{ // state is Locked
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already locked"}},
-			stateChange{state: mutStateUnlocked, err: nil},
-			stateChange{state: mutStateL, err: &invalidActError{reason: "locked"}},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already locked"}},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already locked"}},
+			stateChange{final: lkStateUnlocked, err: nil},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "locked"}},
 		},
 		[]stateChange{ // state is Rlocked
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
-			stateChange{state: mutStateR, err: &invalidActError{reason: "already rlocked"}},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "rlocked"}},
-			stateChange{state: mutStateUnlocked, err: nil},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{final: lkStateR, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "rlocked"}},
+			stateChange{final: lkStateUnlocked, err: nil},
 		},
 		[]stateChange{ // state is may be Locked
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
-			stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
-			stateChange{state: mutStateUnlocked, err: nil},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?locked"}},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{final: lkStateMayLR, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{final: lkStateUnlocked, err: nil},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "?locked"}},
 		},
 		[]stateChange{ // state is may be RLocked
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already rlocked"}},
-			stateChange{state: mutStateMayR, err: &invalidActError{reason: "already rlocked"}},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
-			stateChange{state: mutStateUnlocked, err: nil},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{final: lkStateMayR, err: &invalidActError{reason: "already rlocked"}},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "?rlocked"}},
+			stateChange{final: lkStateUnlocked, err: nil},
 		},
 		[]stateChange{ // state is may be RLocked and Locked
-			stateChange{state: mutStateL, err: &invalidActError{reason: "already ?locked"}},
-			stateChange{state: mutStateMayLR, err: &invalidActError{reason: "already ?locked"}},
-			stateChange{state: mutStateUnlocked, err: &invalidActError{reason: "?rwlocked"}},
-			stateChange{state: mutStateMayL, err: &invalidActError{reason: "?rwlocked"}},
+			stateChange{final: lkStateL, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{final: lkStateMayLR, err: &invalidActError{reason: "already ?locked"}},
+			stateChange{final: lkStateUnlocked, err: &invalidActError{reason: "?rwlocked"}},
+			stateChange{final: lkStateMayL, err: &invalidActError{reason: "?rwlocked"}},
 		},
 	}
 	// stateMergeTable maps two states from branches of code into a result one.
-	stateMergeTable = [][]mutexState{
-		[]mutexState{ // mutStateUnlocked
-			mutStateUnlocked, mutStateMayL, mutStateR, mutStateMayL, mutStateMayR, mutStateMayLR,
+	stateMergeTable = [][]lockerState{
+		[]lockerState{ // mutStateUnlocked
+			lkStateUnlocked, lkStateMayL, lkStateR, lkStateMayL, lkStateMayR, lkStateMayLR,
 		},
-		[]mutexState{ // mutStateL
-			mutStateMayL, mutStateL, mutStateMayLR, mutStateMayL, mutStateMayLR, mutStateMayLR,
+		[]lockerState{ // mutStateL
+			lkStateMayL, lkStateL, lkStateMayLR, lkStateMayL, lkStateMayLR, lkStateMayLR,
 		},
-		[]mutexState{ // mutStateR
-			mutStateMayR, mutStateMayLR, mutStateR, mutStateMayLR, mutStateMayR, mutStateMayLR,
+		[]lockerState{ // mutStateR
+			lkStateMayR, lkStateMayLR, lkStateR, lkStateMayLR, lkStateMayR, lkStateMayLR,
 		},
-		[]mutexState{ // mutStateMayL
-			mutStateMayL, mutStateMayL, mutStateMayLR, mutStateMayL, mutStateMayLR, mutStateMayLR,
+		[]lockerState{ // mutStateMayL
+			lkStateMayL, lkStateMayL, lkStateMayLR, lkStateMayL, lkStateMayLR, lkStateMayLR,
 		},
-		[]mutexState{ // mutStateMayR
-			mutStateMayR, mutStateMayLR, mutStateMayR, mutStateMayLR, mutStateMayR, mutStateMayLR,
+		[]lockerState{ // mutStateMayR
+			lkStateMayR, lkStateMayLR, lkStateMayR, lkStateMayLR, lkStateMayR, lkStateMayLR,
 		},
-		[]mutexState{ // mutStateMayLR
-			mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR, mutStateMayLR,
+		[]lockerState{ // mutStateMayLR
+			lkStateMayLR, lkStateMayLR, lkStateMayLR, lkStateMayLR, lkStateMayLR, lkStateMayLR,
 		},
 	}
 )
 
-type mutexState int
+type stateChange struct {
+	final lockerState
+	err   *invalidActError
+}
 
-func (m mutexState) String() string {
-	switch m {
-	case mutStateUnlocked:
+type lockerState int
+
+func (ls lockerState) String() string {
+	switch ls {
+	case lkStateUnlocked:
 		return "unlocked"
-	case mutStateL:
+	case lkStateL:
 		return "locked"
-	case mutStateR:
+	case lkStateR:
 		return "rlocked"
-	case mutStateMayL:
+	case lkStateMayL:
 		return "?locked"
-	case mutStateMayR:
+	case lkStateMayR:
 		return "?rlocked"
-	case mutStateMayLR:
+	case lkStateMayLR:
 		return "?rwlocked"
 	}
 	return "unknown"
 }
 
-type mutexAct int
+type lockerAct int
 
-func (m mutexAct) String() string {
-	switch m {
-	case mutActLock:
+func (la lockerAct) String() string {
+	switch la {
+	case lkActLock:
 		return "lock"
-	case mutActRLock:
+	case lkActRLock:
 		return "rlock"
-	case mutActUnlock:
+	case lkActUnlock:
 		return "unlock"
-	case mutActRUnlock:
+	case lkActRUnlock:
 		return "runlock"
 	}
 	return "unknown"
@@ -122,8 +127,8 @@ func (m mutexAct) String() string {
 
 type invalidStateError struct {
 	object   string
-	expected mutexState
-	actual   mutexState
+	expected lockerState
+	actual   lockerState
 	reason   string
 }
 
@@ -138,7 +143,7 @@ func (e invalidStateError) Error() string {
 type invalidActError struct {
 	subject string
 	object  string
-	action  mutexAct
+	action  lockerAct
 	reason  string
 }
 
@@ -153,35 +158,30 @@ func (e invalidActError) Error() string {
 	return result
 }
 
-type stateChange struct {
-	state mutexState
-	err   *invalidActError
+type lockerStates struct {
+	states map[string]lockerState
 }
 
-type mutState struct {
-	mut map[string]mutexState
+func newLockerStates() *lockerStates {
+	return &lockerStates{states: make(map[string]lockerState)}
 }
 
-func newMutState() *mutState {
-	return &mutState{mut: make(map[string]mutexState)}
+func (ls *lockerStates) set(name string, state lockerState) {
+	ls.states[name] = state
 }
 
-func (ss *mutState) set(name string, state mutexState) {
-	ss.mut[name] = state
-}
-
-func (ss *mutState) mutState(name string) (mutexState, bool) {
-	state, found := ss.mut[name]
+func (ls *lockerStates) state(name string) (lockerState, bool) {
+	state, found := ls.states[name]
 	if !found {
-		state = mutStateUnlocked
+		state = lkStateUnlocked
 	}
 	return state, found
 }
 
-func (ss *mutState) stateChange(id string, act mutexAct) *invalidActError {
-	old, _ := ss.mutState(id)
+func (ls *lockerStates) stateChange(id string, act lockerAct) *invalidActError {
+	old, _ := ls.state(id)
 	change := stateChangeTable[old][act]
-	ss.mut[id] = change.state
+	ls.states[id] = change.final
 	if change.err == nil {
 		return nil
 	}
@@ -190,30 +190,30 @@ func (ss *mutState) stateChange(id string, act mutexAct) *invalidActError {
 	return &result
 }
 
-func (ss *mutState) ensureState(name string, state mutexState) *invalidStateError {
-	curState, _ := ss.mutState(name)
+func (ls *lockerStates) ensureState(name string, state lockerState) *invalidStateError {
+	curState, _ := ls.state(name)
 	if curState == state {
 		return nil
 	}
-	if state == mutStateR && curState == mutStateL {
+	if state == lkStateR && curState == lkStateL {
 		return nil
 	}
 	return &invalidStateError{object: name, actual: curState, expected: state}
 }
 
-func mergeStates(states []*mutState) *mutState {
+func mergeStates(states []*lockerStates) *lockerStates {
 	allNames := make(map[string]struct{})
 	for _, state := range states {
-		for k := range state.mut {
+		for k := range state.states {
 			allNames[k] = struct{}{}
 		}
 	}
-	newState := newMutState()
+	newState := newLockerStates()
 	for name := range allNames {
-		resultState := mutStateUnknown
+		resultState := lkStateUnknown
 		for _, state := range states {
-			objState, _ := state.mutState(name)
-			if resultState == mutStateUnknown {
+			objState, _ := state.state(name)
+			if resultState == lkStateUnknown {
 				resultState = objState
 				continue
 			}
@@ -226,10 +226,10 @@ func mergeStates(states []*mutState) *mutState {
 	return newState
 }
 
-func copyMutState(st *mutState) *mutState {
-	result := newMutState()
-	for k, v := range st.mut {
-		result.mut[k] = v
+func copyLockerStates(st *lockerStates) *lockerStates {
+	result := newLockerStates()
+	for k, v := range st.states {
+		result.states[k] = v
 	}
 	return result
 }
