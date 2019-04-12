@@ -34,7 +34,18 @@ type op struct {
 }
 
 func (o op) GoString() string {
-	buf := bytes.NewBufferString(o.typ.String() + " ")
-	buf.WriteString(o.object.Name)
-	return buf.String()
+	return o.typ.String() + ":" + o.object.Name
+}
+
+type opchain []op
+
+func (oc opchain) GoString() string {
+	var buff bytes.Buffer
+	for i, o := range oc {
+		if i != 0 {
+			buff.WriteString(",")
+		}
+		buff.WriteString(o.GoString())
+	}
+	return buff.String()
 }

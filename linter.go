@@ -115,7 +115,7 @@ func makeChecker(name string) Checker {
 	case "m":
 		return newMutexChecker()
 	case "mstate":
-		return newLockerStateChecker([]string{"sync.Mutex"})
+		return newLockerStateChecker([]string{"sync.Mutex", "sync.RWMutex"})
 	default:
 		return nil
 	}

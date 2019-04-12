@@ -18,25 +18,22 @@ func init() {
 	fmt.Println(b)
 }
 
-func someFunc() {
-	loc := 0
-	_ = loc
+func doubleLock() {
 	m.Lock()
-	b = 0
-	fmt.Println(b)
+	m.Lock()
+}
+
+func doubleUnlock() {
+	m.Lock()
 	m.Unlock()
-	c = 0
-	localFunc := func() {
+	m.Unlock()
+}
 
-	}
-	func() {
-
-	}()
-	localFunc()
+func unlockedUnlock() {
+	m.Unlock()
 }
 
 func main() {
 	var b int
 	_ = b
-	someFunc()
 }

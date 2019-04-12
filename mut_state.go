@@ -5,7 +5,7 @@ package synt
 import "fmt"
 
 const (
-	lkStateUnknown = lockerState(iota)
+	lkStateUnknown = lockerState(iota) - 1
 	lkStateUnlocked
 	lkStateL
 	lkStateR
