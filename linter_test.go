@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	testLocation = "testdata"
-	test0Pkg     = "pkg0"
+	testLocation    = "testdata"
+	testPkg0Path    = "pkg0"
+	testPkg0Package = "main"
 )
 
 func TestLinterParsePackage(t *testing.T) {

@@ -24,6 +24,7 @@ var (
 )
 
 type lockerStateChecker struct {
+	filter  func(string) bool
 	types   map[string]struct{}
 	lockers map[*ast.Ident]types.Object
 	ids     *ids
@@ -31,11 +32,12 @@ type lockerStateChecker struct {
 	reports []CheckReport
 }
 
-func newLockerStateChecker(lockTypes []string) *lockerStateChecker {
+func newLockerStateChecker(lockTypes []string, filter func(string) bool) *lockerStateChecker {
 	checker := &lockerStateChecker{
 		types:   make(map[string]struct{}),
 		lockers: make(map[*ast.Ident]types.Object),
 		ids:     newIds(),
+		filter:  filter,
 	}
 	for _, typ := range lockTypes {
 		checker.types[typ] = struct{}{}
@@ -65,7 +67,6 @@ func (lsc *lockerStateChecker) collectLockers(info *types.Info) {
 		if _, needed := lsc.types[objectTypeString(obj)]; needed {
 			lsc.lockers[ident] = obj
 			lsc.ids.add(obj)
-			continue
 		}
 	}
 }
@@ -84,26 +85,32 @@ func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
 func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
 	defs := buildDefs(info.Pkg.Files)
 	for name, def := range defs.functions {
-		lsc.checkFunction(name, def)
+		if lsc.filter == nil || lsc.filter(name) {
+			lsc.checkFunction(name, def)
+		}
 	}
 }
 
 func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
 	fl := buildFlow(def.node.Body)
-	lsc.checkFlow(fl)
+	lsc.checkFlow(fl, newLockerStates())
 }
 
-func (lsc *lockerStateChecker) checkFlow(fl flow) {
-	states := newLockerStates()
+func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
 	for _, node := range fl {
-		if node.branches != nil {
-			continue // TODO (avd)
-		}
 		chains := checkStatements(node.statements)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
+		if node.branches != nil {
+			var branchStates []*lockerStates
+			for _, flow := range node.branches {
+				branchStates = append(branchStates, lsc.checkFlow(flow, copyLockerStates(states)))
+			}
+			states = mergeStates(branchStates)
+		}
 	}
+	return states
 }
 
 func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
@@ -116,7 +123,7 @@ func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
 		if !found || i == 0 {
 			continue
 		}
-		obj := chain[i-1].object
+		obj := chain[i-1].object // object, on which the operation is performed
 		if id := lsc.idForIdent(obj); len(id) > 0 {
 			if err := states.stateChange(id, act); err != nil {
 				lsc.reports = append(lsc.reports, CheckReport{Err: err, Pos: op.object.Pos()})

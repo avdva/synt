@@ -16,27 +16,20 @@ type flowNode struct {
 func buildFlow(stmt *ast.BlockStmt) flow {
 	var fn flowNode
 	var result flow
+	appendFn := func() {
+		if len(fn.branches) > 0 || len(fn.statements) > 0 {
+			result = append(result, fn)
+			fn = flowNode{}
+		}
+	}
 	for _, st := range stmt.List {
 		switch typed := st.(type) {
 		case *ast.IfStmt:
-			if len(fn.branches) > 0 || len(fn.statements) > 0 {
-				result = append(result, fn)
-			}
-			fn = flowNode{}
-			if typed.Init != nil {
-				fn.statements = append(fn.statements, typed.Init)
-			}
-			ifFlow := flow{
-				{statements: []ast.Stmt{&ast.ExprStmt{X: typed.Cond}}},
-			}
-			fn.branches = []flow{
-				ifFlow,
-			}
+			appendFn()
+			result = append(result, buildIfFlowNode(typed))
 		case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.GoStmt, *ast.SelectStmt, *ast.RangeStmt:
 		case *ast.BlockStmt:
-			if len(fn.branches) > 0 || len(fn.statements) > 0 {
-				result = append(result, fn)
-			}
+			appendFn()
 			result = append(result, flowNode{branches: []flow{buildFlow(typed)}})
 		case *ast.DeferStmt:
 		default:
@@ -52,4 +45,34 @@ func buildFlow(stmt *ast.BlockStmt) flow {
 		result = append(result, fn)
 	}
 	return result
+}
+
+func buildIfFlowNode(stmt *ast.IfStmt) flowNode {
+	var inits []ast.Stmt
+	fn := flowNode{}
+	for stmt != nil {
+		inits = append(inits, stmt.Init)
+		branchFlow := flow{
+			{statements: []ast.Stmt{&ast.ExprStmt{X: stmt.Cond}}},
+		}
+		bodyFlow := buildFlow(stmt.Body)
+		branchFlow = append(branchFlow, bodyFlow...)
+		fn.branches = append(fn.branches, branchFlow)
+		switch typed := stmt.Else.(type) {
+		case nil:
+			stmt = nil
+		case *ast.IfStmt:
+			stmt = typed
+		case *ast.BlockStmt:
+			fn.branches = append(fn.branches, buildFlow(typed))
+			stmt = nil
+		case *ast.ExprStmt:
+			fn.branches = append(fn.branches, flow{{statements: []ast.Stmt{typed}}})
+			stmt = nil
+		}
+	}
+	for i := range inits {
+		fn.branches[i] = append(flow{{statements: inits[i:]}}, fn.branches[i]...)
+	}
+	return fn
 }

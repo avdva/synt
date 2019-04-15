@@ -7,7 +7,7 @@ import (
 
 var (
 	a int
-	m sync.Mutex
+	m sync.RWMutex
 	// synt: m.Lock
 	b int
 )
@@ -30,6 +30,50 @@ func doubleUnlock() {
 }
 
 func unlockedUnlock() {
+	m.Unlock()
+}
+
+func ifLock() {
+	m.Lock()
+	if a := 0; a > 0 {
+		m.RLock()
+	}
+}
+
+func ifLock2() {
+	if a := 0; a > 0 {
+		m.Lock()
+	} else {
+		m.Lock()
+	}
+	m.Unlock()
+}
+
+func ifLock3() {
+	if a := 0; a > 0 {
+		m.Lock()
+	} else {
+		m.RLock()
+	}
+	m.Unlock()
+}
+
+func ifLock4() {
+	if true {
+		m.Lock()
+	} else if false {
+		m.Lock()
+		if true {
+			m.Unlock()
+		} else {
+			m.Unlock()
+		}
+		m.Lock()
+	} else {
+		m.RLock()
+		m.RUnlock()
+		m.Lock()
+	}
 	m.Unlock()
 }
 

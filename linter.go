@@ -13,6 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	stdLockers = []string{"sync.Mutex", "sync.RWMutex"}
+)
+
 type Linter struct {
 	fs       *token.FileSet
 	pkgs     map[string]*ast.Package
@@ -25,8 +29,7 @@ type Report struct {
 }
 
 func New(path string, checkers []string) (*Linter, error) {
-	fs := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fs, path, notests, parser.ParseComments)
+	pkgs, fs, err := parsePackage(path)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +46,9 @@ func DoDir(name string, checkers []string) ([]Report, error) {
 
 func (l *Linter) Do(pkg string) (result []Report, firstErr error) {
 	checkers := makeCheckers(l.checkers)
-
 	if len(pkg) == 0 {
 		for name, pkg := range l.pkgs {
-			if reports, err := doPackage(pkg, l.fs, checkers); err != nil {
+			if reports, err := doPackage(pkg, l.fs, checkers...); err != nil {
 				if firstErr == nil {
 					firstErr = errors.Wrapf(err, "error checking package %q", name)
 				}
@@ -55,14 +57,14 @@ func (l *Linter) Do(pkg string) (result []Report, firstErr error) {
 			}
 		}
 	} else if pkg, found := l.pkgs[pkg]; found {
-		result, firstErr = doPackage(pkg, l.fs, checkers)
+		result, firstErr = doPackage(pkg, l.fs, checkers...)
 	} else {
 		firstErr = errors.New("no such package")
 	}
 	return result, firstErr
 }
 
-func doPackage(pkg *ast.Package, fs *token.FileSet, checkers []Checker) ([]Report, error) {
+func doPackage(pkg *ast.Package, fs *token.FileSet, checkers ...Checker) ([]Report, error) {
 	var reports []CheckReport
 	info := &CheckInfo{
 		Pkg: pkg,
@@ -79,6 +81,9 @@ func doPackage(pkg *ast.Package, fs *token.FileSet, checkers []Checker) ([]Repor
 }
 
 func checkReportsToReports(reports []CheckReport, fs *token.FileSet) []Report {
+	if reports == nil {
+		return nil
+	}
 	sort.Slice(reports, func(i, j int) bool {
 		lhs, rhs := fs.Position(reports[i].Pos), fs.Position(reports[j].Pos)
 		if lhs.Filename != rhs.Filename {
@@ -94,6 +99,15 @@ func checkReportsToReports(reports []CheckReport, fs *token.FileSet) []Report {
 		})
 	}
 	return result
+}
+
+func parsePackage(path string) (map[string]*ast.Package, *token.FileSet, error) {
+	fs := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fs, path, notests, parser.ParseComments)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pkgs, fs, nil
 }
 
 func notests(info os.FileInfo) bool {
@@ -115,7 +129,7 @@ func makeChecker(name string) Checker {
 	case "m":
 		return newMutexChecker()
 	case "mstate":
-		return newLockerStateChecker([]string{"sync.Mutex", "sync.RWMutex"})
+		return newLockerStateChecker(stdLockers, nil)
 	default:
 		return nil
 	}
