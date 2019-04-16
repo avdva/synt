@@ -23,8 +23,14 @@ var (
 	}
 )
 
+type lscConfig struct {
+	lockTypes  []string
+	autoGuards bool
+	filter     func(string) bool
+}
+
 type lockerStateChecker struct {
-	filter  func(string) bool
+	config  lscConfig
 	types   map[string]struct{}
 	lockers map[*ast.Ident]types.Object
 	ids     *ids
@@ -32,14 +38,14 @@ type lockerStateChecker struct {
 	reports []CheckReport
 }
 
-func newLockerStateChecker(lockTypes []string, filter func(string) bool) *lockerStateChecker {
+func newLockerStateChecker(config lscConfig) *lockerStateChecker {
 	checker := &lockerStateChecker{
+		config:  config,
 		types:   make(map[string]struct{}),
 		lockers: make(map[*ast.Ident]types.Object),
 		ids:     newIds(),
-		filter:  filter,
 	}
-	for _, typ := range lockTypes {
+	for _, typ := range config.lockTypes {
 		checker.types[typ] = struct{}{}
 	}
 	return checker
@@ -84,8 +90,11 @@ func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
 
 func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
 	defs := buildDefs(info.Pkg.Files)
+	if lsc.config.autoGuards {
+
+	}
 	for name, def := range defs.functions {
-		if lsc.filter == nil || lsc.filter(name) {
+		if lsc.config.filter == nil || lsc.config.filter(name) {
 			lsc.checkFunction(name, def)
 		}
 	}

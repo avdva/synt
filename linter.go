@@ -129,7 +129,7 @@ func makeChecker(name string) Checker {
 	case "m":
 		return newMutexChecker()
 	case "mstate":
-		return newLockerStateChecker(stdLockers, nil)
+		return newLockerStateChecker(lscConfig{lockTypes: stdLockers})
 	default:
 		return nil
 	}

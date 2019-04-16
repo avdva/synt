@@ -7,19 +7,14 @@ import (
 	"strings"
 )
 
-type annotation struct {
-	obj dotExpr
-	not bool
-}
-
 type methodDef struct {
 	node        *ast.FuncDecl
-	annotations []annotation
+	annotations []string
 }
 
 type varDef struct {
 	node        *ast.Ident
-	annotations []annotation
+	annotations []string
 }
 
 type typeDef struct {
@@ -123,11 +118,11 @@ func (d *defs) addValueSpec(node *ast.ValueSpec) {
 	}
 }
 
-func parseComments(comments *ast.CommentGroup) []annotation {
+func parseComments(comments *ast.CommentGroup) []string {
 	const (
 		tag = "synt:"
 	)
-	var result []annotation
+	var result []string
 	if comments == nil || len(comments.Text()) == 0 {
 		return result
 	}
@@ -137,12 +132,17 @@ func parseComments(comments *ast.CommentGroup) []annotation {
 			continue
 		}
 		text = text[len(tag):]
-		parts := strings.Split(text, ",")
+		parts := strings.Split(text, " ")
 		for _, part := range parts {
-			result = append(result, parseRecord(part))
+			result = append(result, part)
 		}
 	}
 	return result
+}
+
+type annotation struct {
+	obj dotExpr
+	not bool
 }
 
 func parseRecord(rec string) annotation {
