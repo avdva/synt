@@ -24,8 +24,8 @@ func TestScopeVisitor(t *testing.T) {
 	expected := &defs{
 		vars: map[string]*varDef{
 			"a": &varDef{},
-			"b": &varDef{annotations: []annotation{{obj: dotExprFromParts("m", "Lock")}}},
-			"c": &varDef{annotations: []annotation{{obj: dotExprFromParts("m", "Lock")}}},
+			"b": &varDef{annotations: []string{"m.Lock"}},
+			"c": &varDef{annotations: []string{"m.Lock"}},
 			"m": &varDef{},
 			"n": &varDef{},
 		},

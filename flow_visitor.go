@@ -1,4 +1,4 @@
-// Copyright 2017 Aleksandr Demakin. All rights reserved.
+// Copyright 2019 Aleksandr Demakin. All rights reserved.
 
 package synt
 
@@ -11,39 +11,45 @@ type flow []flowNode
 type flowNode struct {
 	statements []ast.Stmt
 	branches   []flow
+	defers     []ast.Stmt
 }
 
 func buildFlow(stmt *ast.BlockStmt) flow {
 	var fn flowNode
 	var result flow
-	appendFn := func() {
-		if len(fn.branches) > 0 || len(fn.statements) > 0 {
+	appendNode := func(statements ...ast.Stmt) {
+		if len(fn.branches) > 0 || len(fn.statements) > 0 || len(fn.defers) > 0 {
 			result = append(result, fn)
 			fn = flowNode{}
+		}
+		if len(statements) > 0 {
+			fn.statements = statements
+		}
+	}
+	appendNodeOrStatements := func(statements ...ast.Stmt) {
+		if len(fn.branches) == 0 && len(fn.defers) == 0 {
+			fn.statements = append(fn.statements, statements...)
+		} else {
+			appendNode(statements...)
 		}
 	}
 	for _, st := range stmt.List {
 		switch typed := st.(type) {
 		case *ast.IfStmt:
-			appendFn()
+			appendNode()
 			result = append(result, buildIfFlowNode(typed))
 		case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.GoStmt, *ast.SelectStmt, *ast.RangeStmt:
 		case *ast.BlockStmt:
-			appendFn()
+			appendNode()
 			result = append(result, flowNode{branches: []flow{buildFlow(typed)}})
 		case *ast.DeferStmt:
+			appendNodeOrStatements(expressionsToStatemants(typed.Call.Args...)...)
+			fn.defers = append(expressionsToStatemants(typed.Call), fn.defers...)
 		default:
-			if len(fn.branches) == 0 {
-				fn.statements = append(fn.statements, st)
-			} else {
-				result = append(result, fn)
-				fn = flowNode{statements: []ast.Stmt{st}}
-			}
+			appendNodeOrStatements(st)
 		}
 	}
-	if len(fn.branches) > 0 || len(fn.statements) > 0 {
-		result = append(result, fn)
-	}
+	appendNode()
 	return result
 }
 
@@ -53,7 +59,7 @@ func buildIfFlowNode(stmt *ast.IfStmt) flowNode {
 	for stmt != nil {
 		inits = append(inits, stmt.Init)
 		branchFlow := flow{
-			{statements: []ast.Stmt{&ast.ExprStmt{X: stmt.Cond}}},
+			{statements: expressionsToStatemants(stmt.Cond)},
 		}
 		bodyFlow := buildFlow(stmt.Body)
 		branchFlow = append(branchFlow, bodyFlow...)
@@ -75,4 +81,12 @@ func buildIfFlowNode(stmt *ast.IfStmt) flowNode {
 		fn.branches[i] = append(flow{{statements: inits[i:]}}, fn.branches[i]...)
 	}
 	return fn
+}
+
+func expressionsToStatemants(exprs ...ast.Expr) []ast.Stmt {
+	var stmts []ast.Stmt
+	for _, expr := range exprs {
+		stmts = append(stmts, &ast.ExprStmt{X: expr})
+	}
+	return stmts
 }

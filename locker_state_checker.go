@@ -102,7 +102,9 @@ func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
 
 func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
 	fl := buildFlow(def.node.Body)
-	lsc.checkFlow(fl, newLockerStates())
+	states := newLockerStates()
+	lsc.checkFlow(fl, states)
+	lsc.checkDefers(fl, states)
 }
 
 func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
@@ -120,6 +122,15 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 		}
 	}
 	return states
+}
+
+func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) {
+	for i := len(fl) - 1; i >= 0; i-- {
+		chains := checkStatements(fl[i].defers)
+		for _, chain := range chains {
+			lsc.checkChain(states, chain)
+		}
+	}
 }
 
 func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
@@ -156,6 +167,7 @@ func checkExpr(expr *ast.ExprStmt) opchain {
 	var result opchain
 	switch typed := expr.X.(type) {
 	case *ast.CallExpr:
+		// TODO(avd) - check args for non-deffered calls.
 		result = append(result, checkCallExpr(typed)...)
 	}
 	return result

@@ -77,6 +77,17 @@ func ifLock4() {
 	m.Unlock()
 }
 
+func defferedUnlock() {
+	defer m.Unlock()
+}
+
+func defferedDoubleUnlock() {
+	m.Lock()
+	defer m.Unlock()
+	a = 0
+	defer m.Unlock()
+}
+
 func main() {
 	var b int
 	_ = b

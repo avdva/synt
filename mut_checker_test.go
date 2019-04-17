@@ -22,31 +22,31 @@ func TestLinterParseComments(t *testing.T) {
 			"Type1": &typeDef{
 				methods: map[string]methodDef{
 					"func1": methodDef{
-						annotations: []annotation{
-							annotation{obj: dotExprFromParts("t", "m", "Lock"), not: true},
+						annotations: []string{
+							"!t.m.Lock",
 						},
 					},
 					"func2": methodDef{
-						annotations: []annotation{
-							annotation{obj: dotExprFromParts("t", "m", "Lock")},
+						annotations: []string{
+							"t.m.Lock",
 						},
 					},
 					"func3": methodDef{
-						annotations: []annotation{
-							annotation{obj: dotExprFromParts("t", "m", "RLock")},
-							annotation{obj: dotExprFromParts("t", "mut", "Lock")},
+						annotations: []string{
+							"t.m.RLock",
+							"t.mut.Lock",
 						},
 					},
 					"func3_1": methodDef{},
 					"func3_2": methodDef{
-						annotations: []annotation{
-							annotation{obj: dotExprFromParts("t", "m", "Lock")},
+						annotations: []string{
+							"t.m.Lock",
 						},
 					},
 					"func3_3": methodDef{},
 					"func3_4": methodDef{
-						annotations: []annotation{
-							annotation{obj: dotExprFromParts("t", "m", "RLock")},
+						annotations: []string{
+							"t.m.RLock",
 						},
 					},
 					"func3_5": methodDef{},
@@ -370,9 +370,9 @@ func compareMethodDesc(expected, actual *methodDef) error {
 	return nil
 }
 
-func compareAnnotations(expected, actual annotation) error {
-	if !expected.obj.eq(actual.obj) {
-		return errors.Errorf("expected obj %q, got %q", expected.obj.String(), actual.obj.String())
+func compareAnnotations(expected, actual string) error {
+	if expected != actual {
+		return errors.Errorf("expected obj %q, got %q", expected, actual)
 	}
 	return nil
 }
