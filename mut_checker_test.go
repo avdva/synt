@@ -20,60 +20,60 @@ func TestLinterParseComments(t *testing.T) {
 	expected := &defs{
 		types: map[string]*typeDef{
 			"Type1": &typeDef{
-				methods: map[string]methodDef{
-					"func1": methodDef{
+				methods: map[string]*methodDef{
+					"func1": &methodDef{
 						annotations: []string{
 							"!t.m.Lock",
 						},
 					},
-					"func2": methodDef{
+					"func2": &methodDef{
 						annotations: []string{
 							"t.m.Lock",
 						},
 					},
-					"func3": methodDef{
+					"func3": &methodDef{
 						annotations: []string{
 							"t.m.RLock",
 							"t.mut.Lock",
 						},
 					},
-					"func3_1": methodDef{},
-					"func3_2": methodDef{
+					"func3_1": &methodDef{},
+					"func3_2": &methodDef{
 						annotations: []string{
 							"t.m.Lock",
 						},
 					},
-					"func3_3": methodDef{},
-					"func3_4": methodDef{
+					"func3_3": &methodDef{},
+					"func3_4": &methodDef{
 						annotations: []string{
 							"t.m.RLock",
 						},
 					},
-					"func3_5": methodDef{},
-					"func3_6": methodDef{},
-					"func4":   methodDef{},
-					"func5":   methodDef{},
-					"func6":   methodDef{},
-					"func7":   methodDef{},
-					"func8":   methodDef{},
-					"func10":  methodDef{},
-					"func11":  methodDef{},
-					"func12":  methodDef{},
-					"func13":  methodDef{},
-					"func14":  methodDef{},
-					"func15":  methodDef{},
-					"getM":    methodDef{},
-					"self":    methodDef{},
+					"func3_5": &methodDef{},
+					"func3_6": &methodDef{},
+					"func4":   &methodDef{},
+					"func5":   &methodDef{},
+					"func6":   &methodDef{},
+					"func7":   &methodDef{},
+					"func8":   &methodDef{},
+					"func10":  &methodDef{},
+					"func11":  &methodDef{},
+					"func12":  &methodDef{},
+					"func13":  &methodDef{},
+					"func14":  &methodDef{},
+					"func15":  &methodDef{},
+					"getM":    &methodDef{},
+					"self":    &methodDef{},
 				},
 			},
 			"Type2": &typeDef{
-				methods: map[string]methodDef{},
+				methods: map[string]*methodDef{},
 			},
 			"Type3": &typeDef{
-				methods: map[string]methodDef{},
+				methods: map[string]*methodDef{},
 			},
 			"EmptyType": &typeDef{
-				methods: map[string]methodDef{},
+				methods: map[string]*methodDef{},
 			},
 		},
 	}
@@ -351,7 +351,7 @@ func compareTypeDesc(expected, actual *typeDef) error {
 	for k, v := range expected.methods {
 		if md, found := actual.methods[k]; !found {
 			return errors.Errorf("%s type not found", k)
-		} else if err := compareMethodDesc(&v, &md); err != nil {
+		} else if err := compareMethodDesc(v, md); err != nil {
 			return errors.Wrapf(err, "methods %q don't match", k)
 		}
 	}

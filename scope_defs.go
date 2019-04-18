@@ -19,8 +19,8 @@ type varDef struct {
 
 type typeDef struct {
 	expr    ast.Expr
-	methods map[string]methodDef
-	fields  map[string]varDef
+	methods map[string]*methodDef
+	fields  map[string]*varDef
 }
 
 type defs struct {
@@ -73,7 +73,7 @@ func (d *defs) addMethod(node *ast.FuncDecl) {
 		typName = rec.Name
 	}
 	td := d.descForType(typName)
-	td.methods[node.Name.Name] = methodDef{
+	td.methods[node.Name.Name] = &methodDef{
 		node:        node,
 		annotations: annotations,
 	}
@@ -83,8 +83,8 @@ func (d *defs) descForType(typName string) *typeDef {
 	td := d.types[typName]
 	if td == nil {
 		td = &typeDef{
-			methods: make(map[string]methodDef),
-			fields:  make(map[string]varDef),
+			methods: make(map[string]*methodDef),
+			fields:  make(map[string]*varDef),
 		}
 		d.types[typName] = td
 	}
@@ -100,7 +100,7 @@ func (d *defs) addTypeSpec(node *ast.TypeSpec) {
 		}
 		for _, field := range typed.Fields.List {
 			for _, name := range field.Names {
-				td.fields[name.Name] = varDef{
+				td.fields[name.Name] = &varDef{
 					node:        name,
 					annotations: parseComments(field.Doc),
 				}

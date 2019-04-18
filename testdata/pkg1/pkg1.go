@@ -9,7 +9,6 @@ type Type1 struct {
 	m sync.RWMutex
 	// synt: m.Lock
 	i int
-	// synt: m.RLock
 	j int64
 
 	ptr *Type1

@@ -33,6 +33,7 @@ type lockerStateChecker struct {
 	config  lscConfig
 	types   map[string]struct{}
 	lockers map[*ast.Ident]types.Object
+	guards  map[*ast.Ident]*ast.Ident
 	ids     *ids
 	desc    *pkgDesc
 	reports []CheckReport
@@ -43,6 +44,7 @@ func newLockerStateChecker(config lscConfig) *lockerStateChecker {
 		config:  config,
 		types:   make(map[string]struct{}),
 		lockers: make(map[*ast.Ident]types.Object),
+		guards:  make(map[*ast.Ident]*ast.Ident),
 		ids:     newIds(),
 	}
 	for _, typ := range config.lockTypes {
@@ -98,6 +100,13 @@ func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
 			lsc.checkFunction(name, def)
 		}
 	}
+	for typ, def := range defs.types {
+		for fun, def := range def.methods {
+			if lsc.config.filter == nil || lsc.config.filter(typ+"."+fun) {
+				lsc.checkFunction(fun, def)
+			}
+		}
+	}
 }
 
 func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
@@ -108,7 +117,7 @@ func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
 }
 
 func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
-	for _, node := range fl {
+	for _, node := range fl.nodes {
 		chains := checkStatements(node.statements)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
@@ -125,8 +134,8 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 }
 
 func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *lockerStates {
-	for i := len(fl) - 1; i >= 0; i-- {
-		node := fl[i]
+	for i := len(fl.nodes) - 1; i >= 0; i-- {
+		node := fl.nodes[i]
 		chains := checkStatements(node.defers)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
