@@ -113,7 +113,7 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
-		if node.branches != nil {
+		if len(node.branches) > 0 {
 			var branchStates []*lockerStates
 			for _, flow := range node.branches {
 				branchStates = append(branchStates, lsc.checkFlow(flow, copyLockerStates(states)))
@@ -124,13 +124,22 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 	return states
 }
 
-func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) {
+func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *lockerStates {
 	for i := len(fl) - 1; i >= 0; i-- {
-		chains := checkStatements(fl[i].defers)
+		node := fl[i]
+		chains := checkStatements(node.defers)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
+		if len(node.branches) > 0 {
+			var branchStates []*lockerStates
+			for _, flow := range node.branches {
+				branchStates = append(branchStates, lsc.checkDefers(flow, copyLockerStates(states)))
+			}
+			states = mergeStates(branchStates)
+		}
 	}
+	return states
 }
 
 func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {

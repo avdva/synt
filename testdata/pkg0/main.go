@@ -88,6 +88,19 @@ func defferedDoubleUnlock() {
 	defer m.Unlock()
 }
 
+func defferedIfUnlock() {
+	m.Lock()
+	defer m.Unlock()
+	defer m.Lock()
+	if true {
+		defer m.RUnlock()
+	} else if false {
+		defer m.Unlock()
+	} else {
+		defer m.Unlock()
+	}
+}
+
 func main() {
 	var b int
 	_ = b

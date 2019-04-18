@@ -91,6 +91,16 @@ func TestLockerStateCheckerDefferedDoubleUnlock(t *testing.T) {
 	testFuncLSC(r, pkg0CheckInfo, "defferedDoubleUnlock", expected)
 }
 
+func TestLockerStateCheckerDefferedIfUnlock(t *testing.T) {
+	r := require.New(t)
+	path := strings.Join([]string{testPkg0Path, "main.go"}, "/")
+	expected := []Report{
+		{Location: path + ":94:10", Err: "cannot \"lock\"  [already ?locked]"},
+		{Location: path + ":96:11", Err: "cannot \"runlock\"  [locked]"},
+	}
+	testFuncLSC(r, pkg0CheckInfo, "defferedIfUnlock", expected)
+}
+
 func makeLSCFilter(names ...string) func(string) bool {
 	return func(name string) bool {
 		for _, n := range names {
