@@ -9,12 +9,12 @@ import (
 
 type methodDef struct {
 	node        *ast.FuncDecl
-	annotations []string
+	annotations []annotation
 }
 
 type varDef struct {
 	node        *ast.Ident
-	annotations []string
+	annotations []annotation
 }
 
 type typeDef struct {
@@ -118,11 +118,11 @@ func (d *defs) addValueSpec(node *ast.ValueSpec) {
 	}
 }
 
-func parseComments(comments *ast.CommentGroup) []string {
+func parseComments(comments *ast.CommentGroup) []annotation {
 	const (
 		tag = "synt:"
 	)
-	var result []string
+	var result []annotation
 	if comments == nil || len(comments.Text()) == 0 {
 		return result
 	}
@@ -132,26 +132,7 @@ func parseComments(comments *ast.CommentGroup) []string {
 			continue
 		}
 		text = text[len(tag):]
-		parts := strings.Split(text, " ")
-		for _, part := range parts {
-			result = append(result, part)
-		}
+		result = append(result, annotation(text))
 	}
-	return result
-}
-
-type annotation struct {
-	obj dotExpr
-	not bool
-}
-
-func parseRecord(rec string) annotation {
-	var result annotation
-	rec = strings.TrimSpace(rec)
-	if strings.HasPrefix(rec, "!") {
-		result.not = true
-		rec = strings.TrimLeft(rec, "!")
-	}
-	result.obj = dotExprFromParts(strings.Split(rec, ".")...)
 	return result
 }

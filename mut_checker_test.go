@@ -22,30 +22,30 @@ func TestLinterParseComments(t *testing.T) {
 			"Type1": &typeDef{
 				methods: map[string]*methodDef{
 					"func1": &methodDef{
-						annotations: []string{
+						annotations: []annotation{
 							"!t.m.Lock",
 						},
 					},
 					"func2": &methodDef{
-						annotations: []string{
+						annotations: []annotation{
 							"t.m.Lock",
 						},
 					},
 					"func3": &methodDef{
-						annotations: []string{
+						annotations: []annotation{
 							"t.m.RLock",
 							"t.mut.Lock",
 						},
 					},
 					"func3_1": &methodDef{},
 					"func3_2": &methodDef{
-						annotations: []string{
+						annotations: []annotation{
 							"t.m.Lock",
 						},
 					},
 					"func3_3": &methodDef{},
 					"func3_4": &methodDef{
-						annotations: []string{
+						annotations: []annotation{
 							"t.m.RLock",
 						},
 					},
@@ -370,7 +370,7 @@ func compareMethodDesc(expected, actual *methodDef) error {
 	return nil
 }
 
-func compareAnnotations(expected, actual string) error {
+func compareAnnotations(expected, actual annotation) error {
 	if expected != actual {
 		return errors.Errorf("expected obj %q, got %q", expected, actual)
 	}

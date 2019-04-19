@@ -3,6 +3,7 @@
 package synt
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 )
@@ -33,7 +34,7 @@ type lockerStateChecker struct {
 	config  lscConfig
 	types   map[string]struct{}
 	lockers map[*ast.Ident]types.Object
-	guards  map[*ast.Ident]*ast.Ident
+	guards  map[*ast.Ident][]*ast.Ident
 	ids     *ids
 	desc    *pkgDesc
 	reports []CheckReport
@@ -44,7 +45,7 @@ func newLockerStateChecker(config lscConfig) *lockerStateChecker {
 		config:  config,
 		types:   make(map[string]struct{}),
 		lockers: make(map[*ast.Ident]types.Object),
-		guards:  make(map[*ast.Ident]*ast.Ident),
+		guards:  make(map[*ast.Ident][]*ast.Ident),
 		ids:     newIds(),
 	}
 	for _, typ := range config.lockTypes {
@@ -90,8 +91,77 @@ func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
 	return lsc.ids.strID(obj)
 }
 
+func (lsc *lockerStateChecker) buildGuards(defs *defs) {
+	for _, def := range defs.vars {
+		for _, annotation := range def.annotations {
+			for _, g := range annotation.guards() {
+				if id := lsc.resolveObject(def.node, defs, g.object); id != nil {
+					fmt.Println(id)
+				}
+			}
+		}
+	}
+}
+
+func (lsc *lockerStateChecker) resolveObject(id *ast.Ident, defs *defs, de dotExpr) *ast.Ident {
+	if len(de.parts) == 0 {
+		return nil
+	}
+
+	if mainObj := de.part(0); mainObj == "type" {
+
+	} else {
+		ident, found := defs.vars[mainObj]
+		if !found {
+			return nil
+		}
+		id = ident.node
+	}
+	def := lsc.desc.info.Defs[id]
+	if def == nil {
+		return nil
+	}
+	for i := 1; i < de.len(); i++ {
+		if obj := resolveField(def, de.part(i)); obj != nil {
+			if id = lsc.desc.typesToIdents[obj]; id == nil {
+				return nil
+			}
+			if def = lsc.desc.info.Defs[id]; def == nil {
+				return nil
+			}
+		} else {
+			return nil
+		}
+		def = lsc.desc.info.Defs[id]
+	}
+	return id
+}
+
+func resolveField(obj types.Object, field string) types.Object {
+	typ := obj.Type()
+	for {
+		if _, ok := typ.(*types.Named); ok {
+			typ = typ.Underlying()
+		} else {
+			break
+		}
+	}
+	st, ok := typ.(*types.Struct)
+	if !ok {
+		return nil
+	}
+	for i := 0; i < st.NumFields(); i++ {
+		v := st.Field(i)
+		if v.Name() == field {
+			return v
+		}
+	}
+	return nil
+}
+
 func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
 	defs := buildDefs(info.Pkg.Files)
+	lsc.buildGuards(defs)
 	if lsc.config.autoGuards {
 
 	}
@@ -255,6 +325,8 @@ func objectTypeString(obj types.Object) string {
 			if named, ok := typed.Elem().(*types.Named); ok {
 				strType = named.String()
 			}
+			obj = nil
+		case *types.Struct:
 			obj = nil
 		default:
 			obj = nil
