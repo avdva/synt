@@ -107,7 +107,6 @@ func (lsc *lockerStateChecker) resolveObject(id *ast.Ident, defs *defs, de dotEx
 	if len(de.parts) == 0 {
 		return nil
 	}
-
 	if mainObj := de.part(0); mainObj == "type" {
 
 	} else {
@@ -117,11 +116,11 @@ func (lsc *lockerStateChecker) resolveObject(id *ast.Ident, defs *defs, de dotEx
 		}
 		id = ident.node
 	}
-	def := lsc.desc.info.Defs[id]
-	if def == nil {
-		return nil
-	}
 	for i := 1; i < de.len(); i++ {
+		def := lsc.desc.info.Defs[id]
+		if def == nil {
+			return nil
+		}
 		if obj := resolveField(def, de.part(i)); obj != nil {
 			if id = lsc.desc.typesToIdents[obj]; id == nil {
 				return nil
@@ -132,31 +131,8 @@ func (lsc *lockerStateChecker) resolveObject(id *ast.Ident, defs *defs, de dotEx
 		} else {
 			return nil
 		}
-		def = lsc.desc.info.Defs[id]
 	}
 	return id
-}
-
-func resolveField(obj types.Object, field string) types.Object {
-	typ := obj.Type()
-	for {
-		if _, ok := typ.(*types.Named); ok {
-			typ = typ.Underlying()
-		} else {
-			break
-		}
-	}
-	st, ok := typ.(*types.Struct)
-	if !ok {
-		return nil
-	}
-	for i := 0; i < st.NumFields(); i++ {
-		v := st.Field(i)
-		if v.Name() == field {
-			return v
-		}
-	}
-	return nil
 }
 
 func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
@@ -333,4 +309,26 @@ func objectTypeString(obj types.Object) string {
 		}
 	}
 	return strType
+}
+
+func resolveField(obj types.Object, field string) types.Object {
+	typ := obj.Type()
+	for {
+		if _, ok := typ.(*types.Named); ok {
+			typ = typ.Underlying()
+		} else {
+			break
+		}
+	}
+	st, ok := typ.(*types.Struct)
+	if !ok {
+		return nil
+	}
+	for i := 0; i < st.NumFields(); i++ {
+		v := st.Field(i)
+		if v.Name() == field {
+			return v
+		}
+	}
+	return nil
 }
