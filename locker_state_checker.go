@@ -3,7 +3,6 @@
 package synt
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 )
@@ -37,6 +36,7 @@ type lockerStateChecker struct {
 	guards  map[*ast.Ident][]*ast.Ident
 	ids     *ids
 	desc    *pkgDesc
+	defs    *defs
 	reports []CheckReport
 }
 
@@ -55,29 +55,43 @@ func newLockerStateChecker(config lscConfig) *lockerStateChecker {
 }
 
 func (lsc *lockerStateChecker) DoPackage(info *CheckInfo) ([]CheckReport, error) {
-	desc, err := makePkgDesc(info.Pkg, info.Fs)
-	if err != nil {
+	if err := lsc.init(info); err != nil {
 		return nil, err
 	}
-	lsc.desc = desc
-	lsc.collectLockers(desc.info)
 	if len(lsc.lockers) == 0 {
 		return nil, nil
 	}
-	lsc.checkFunctions(info)
+	lsc.checkFunctions()
 	return lsc.reports, nil
+}
+
+func (lsc *lockerStateChecker) init(info *CheckInfo) error {
+	desc, err := makePkgDesc(info.Pkg, info.Fs)
+	if err != nil {
+		return err
+	}
+	lsc.desc = desc
+	lsc.collectLockers(desc.info)
+	lsc.defs = buildDefs(info.Pkg.Files)
+	lsc.buildGuards()
+	if lsc.config.autoGuards {
+
+	}
+	return nil
 }
 
 func (lsc *lockerStateChecker) collectLockers(info *types.Info) {
 	for ident, obj := range info.Defs {
-		if obj == nil {
-			continue
-		}
-		if _, needed := lsc.types[objectTypeString(obj)]; needed {
+		if lsc.lockerTypeNeeded(objectTypeString(obj)) {
 			lsc.lockers[ident] = obj
 			lsc.ids.add(obj)
 		}
 	}
+}
+
+func (lsc *lockerStateChecker) lockerTypeNeeded(typ string) bool {
+	_, needed := lsc.types[typ]
+	return needed
 }
 
 func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
@@ -91,62 +105,65 @@ func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
 	return lsc.ids.strID(obj)
 }
 
-func (lsc *lockerStateChecker) buildGuards(defs *defs) {
-	for _, def := range defs.vars {
-		for _, annotation := range def.annotations {
-			for _, g := range annotation.guards() {
-				if id := lsc.resolveObject(def.node, defs, g.object); id != nil {
-					fmt.Println(id)
-				}
+func (lsc *lockerStateChecker) buildGuards() {
+	for _, varDef := range lsc.defs.vars {
+		if guards := lsc.guardsFromAnnotations(nil, varDef.annotations); len(guards) > 0 {
+			lsc.guards[varDef.node] = guards
+		}
+	}
+	for _, typeDef := range lsc.defs.types {
+		for _, fieldDef := range typeDef.fields {
+			if guards := lsc.guardsFromAnnotations(typeDef.node.Name, fieldDef.annotations); len(guards) > 0 {
+				lsc.guards[fieldDef.node] = guards
 			}
 		}
 	}
 }
 
-func (lsc *lockerStateChecker) resolveObject(id *ast.Ident, defs *defs, de dotExpr) *ast.Ident {
-	if len(de.parts) == 0 {
+func (lsc *lockerStateChecker) guardsFromAnnotations(typID *ast.Ident, annotations []annotation) []*ast.Ident {
+	var guards []*ast.Ident
+	for _, annotation := range annotations {
+		for _, g := range annotation.guards() {
+			if id := lsc.resolveDotExpr(typID, g.object); id != nil {
+				guards = append(guards, id)
+			}
+		}
+	}
+	return guards
+}
+
+func (lsc *lockerStateChecker) resolveDotExpr(id *ast.Ident, de dotExpr) *ast.Ident {
+	if de.len() == 0 {
 		return nil
 	}
-	if mainObj := de.part(0); mainObj == "type" {
-
-	} else {
-		ident, found := defs.vars[mainObj]
+	if mainObj := de.part(0); mainObj != "type" {
+		ident, found := lsc.defs.vars[mainObj]
 		if !found {
 			return nil
 		}
 		id = ident.node
 	}
-	for i := 1; i < de.len(); i++ {
+	for i := 1; i < de.len() && id != nil; i++ {
 		def := lsc.desc.info.Defs[id]
 		if def == nil {
 			return nil
 		}
-		if obj := resolveField(def, de.part(i)); obj != nil {
-			if id = lsc.desc.typesToIdents[obj]; id == nil {
-				return nil
-			}
-			if def = lsc.desc.info.Defs[id]; def == nil {
-				return nil
-			}
-		} else {
+		obj := resolveObjectField(def, de.part(i))
+		if obj == nil {
 			return nil
 		}
+		id = lsc.desc.objectsToIdents[obj]
 	}
 	return id
 }
 
-func (lsc *lockerStateChecker) checkFunctions(info *CheckInfo) {
-	defs := buildDefs(info.Pkg.Files)
-	lsc.buildGuards(defs)
-	if lsc.config.autoGuards {
-
-	}
-	for name, def := range defs.functions {
+func (lsc *lockerStateChecker) checkFunctions() {
+	for name, def := range lsc.defs.functions {
 		if lsc.config.filter == nil || lsc.config.filter(name) {
 			lsc.checkFunction(name, def)
 		}
 	}
-	for typ, def := range defs.types {
+	for typ, def := range lsc.defs.types {
 		for fun, def := range def.methods {
 			if lsc.config.filter == nil || lsc.config.filter(typ+"."+fun) {
 				lsc.checkFunction(fun, def)
@@ -164,7 +181,7 @@ func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
 
 func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
 	for _, node := range fl.nodes {
-		chains := checkStatements(node.statements)
+		chains := statementsToOpchain(node.statements)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
@@ -182,7 +199,7 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *lockerStates {
 	for i := len(fl.nodes) - 1; i >= 0; i-- {
 		node := fl.nodes[i]
-		chains := checkStatements(node.defers)
+		chains := statementsToOpchain(node.defers)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
@@ -216,73 +233,6 @@ func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
 	}
 }
 
-func checkStatements(statements []ast.Stmt) []opchain {
-	var result []opchain
-	for _, statement := range statements {
-		switch typed := statement.(type) {
-		case *ast.ExprStmt:
-			result = append(result, checkExpr(typed))
-		}
-	}
-	return result
-}
-
-func checkExpr(expr *ast.ExprStmt) opchain {
-	var result opchain
-	switch typed := expr.X.(type) {
-	case *ast.CallExpr:
-		// TODO(avd) - check args for non-deffered calls.
-		result = append(result, checkCallExpr(typed)...)
-	}
-	return result
-}
-
-func checkCallExpr(expr ast.Expr) opchain {
-	var result opchain
-	for _, elem := range expandCallExpr(expr) {
-		typ := opRead
-		if elem.call {
-			typ = opExec
-		}
-		result = append(result, op{typ: typ, object: elem.id})
-	}
-	return result
-}
-
-type callChain []callChainElem
-
-type callChainElem struct {
-	id   *ast.Ident
-	call bool
-	args []ast.Expr
-}
-
-func expandCallExpr(expr ast.Expr) callChain {
-	var result callChain
-	for expr != nil {
-		switch typed := expr.(type) {
-		case *ast.CallExpr:
-			switch fTyped := typed.Fun.(type) {
-			case *ast.Ident:
-				result = append([]callChainElem{{id: fTyped, args: typed.Args, call: true}}, result...)
-				expr = nil
-			case *ast.SelectorExpr:
-				result = append([]callChainElem{{id: fTyped.Sel, args: typed.Args, call: true}}, result...)
-				expr = fTyped.X
-			}
-		case *ast.SelectorExpr:
-			result = append([]callChainElem{{id: typed.Sel}}, result...)
-			expr = typed.X
-		case *ast.Ident:
-			result = append([]callChainElem{{id: typed}}, result...)
-			expr = nil
-		default:
-			expr = nil
-		}
-	}
-	return result
-}
-
 func objectTypeString(obj types.Object) string {
 	var strType string
 	for obj != nil {
@@ -311,7 +261,7 @@ func objectTypeString(obj types.Object) string {
 	return strType
 }
 
-func resolveField(obj types.Object, field string) types.Object {
+func resolveObjectField(obj types.Object, field string) types.Object {
 	typ := obj.Type()
 	for {
 		if _, ok := typ.(*types.Named); ok {

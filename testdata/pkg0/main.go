@@ -8,7 +8,7 @@ import (
 var (
 	a int
 	m sync.RWMutex
-	// synt: m.Lock
+	// synt: m.Lock wm.wmMut.Lock
 	b int
 )
 
@@ -99,6 +99,18 @@ func defferedIfUnlock() {
 	} else {
 		defer m.Unlock()
 	}
+}
+
+func guardedAccess() {
+	loc := c
+	_ = loc
+	c = 5
+	m.Lock()
+	c = 7
+	m.Unlock()
+	m.RLock()
+	loc = c
+	m.RUnlock()
 }
 
 func main() {

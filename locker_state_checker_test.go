@@ -3,6 +3,7 @@
 package synt
 
 import (
+	"go/ast"
 	"strings"
 	"testing"
 
@@ -101,6 +102,16 @@ func TestLockerStateCheckerDefferedIfUnlock(t *testing.T) {
 	testFuncLSC(r, pkg0CheckInfo, "defferedIfUnlock", expected)
 }
 
+func TestLockerStateCheckerGuardedAccess(t *testing.T) {
+	r := require.New(t)
+	path := strings.Join([]string{testPkg0Path, "main.go"}, "/")
+	expected := []Report{
+		{Location: path + ":94:10", Err: "cannot \"lock\"  [already ?locked]"},
+		{Location: path + ":96:11", Err: "cannot \"runlock\"  [locked]"},
+	}
+	testFuncLSC(r, pkg0CheckInfo, "guardedAccess", expected)
+}
+
 func TestLockerStateCheckerType1Func8(t *testing.T) {
 	r := require.New(t)
 	path := strings.Join([]string{testPkg1Path, "pkg1_2.go"}, "/")
@@ -109,6 +120,36 @@ func TestLockerStateCheckerType1Func8(t *testing.T) {
 		{Location: path + ":140:6", Err: "cannot \"unlock\"  [?rwlocked]"},
 	}
 	testFuncLSC(r, pkg1CheckInfo, "Type1.func8", expected)
+}
+
+func TestLockerStateCheckerBuildGuards(t *testing.T) {
+	r := require.New(t)
+	ch := newLockerStateChecker(lscConfig{lockTypes: stdLockers})
+	r.NoError(ch.init(pkg0CheckInfo))
+	vars := ch.defs.vars
+	types := ch.defs.types
+	expected := map[*ast.Ident][]*ast.Ident{
+		vars["c"].node: []*ast.Ident{vars["m"].node},
+		vars["n"].node: []*ast.Ident{types["withMutex"].fields["wmMut"].node},
+		vars["e"].node: []*ast.Ident{vars["em"].node},
+		vars["b"].node: []*ast.Ident{vars["m"].node, types["withMutex"].fields["wmMut"].node},
+	}
+	r.Equal(expected, ch.guards)
+}
+
+func TestLockerStateCheckerBuildGuards2(t *testing.T) {
+	r := require.New(t)
+	ch := newLockerStateChecker(lscConfig{lockTypes: stdLockers})
+	r.NoError(ch.init(pkg1CheckInfo))
+	types := ch.defs.types
+	typ1Def := types["Type1"]
+	expected := map[*ast.Ident][]*ast.Ident{
+		typ1Def.fields["i"].node: []*ast.Ident{typ1Def.fields["m"].node},
+		typ1Def.fields["k"].node: []*ast.Ident{typ1Def.fields["mut"].node},
+		typ1Def.fields["l"].node: []*ast.Ident{typ1Def.fields["mut"].node},
+		typ1Def.fields["n"].node: []*ast.Ident{typ1Def.fields["mut"].node, typ1Def.fields["m"].node},
+	}
+	r.Equal(expected, ch.guards)
 }
 
 func makeLSCFilter(names ...string) func(string) bool {

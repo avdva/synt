@@ -18,7 +18,7 @@ type varDef struct {
 }
 
 type typeDef struct {
-	expr    ast.Expr
+	node    *ast.TypeSpec
 	methods map[string]*methodDef
 	fields  map[string]*varDef
 }
@@ -93,6 +93,7 @@ func (d *defs) descForType(typName string) *typeDef {
 
 func (d *defs) addTypeSpec(node *ast.TypeSpec) {
 	td := d.descForType(node.Name.Name)
+	td.node = node
 	switch typed := node.Type.(type) {
 	case *ast.StructType:
 		if typed.Fields == nil || len(typed.Fields.List) == 0 {

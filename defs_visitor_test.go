@@ -44,7 +44,7 @@ func zeroAstNodes(defs *defs) {
 		def.node = nil
 	}
 	for _, def := range defs.types {
-		def.expr = nil
+		def.node = nil
 	}
 	for _, def := range defs.vars {
 		def.node = nil

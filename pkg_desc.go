@@ -11,7 +11,7 @@ import (
 
 type pkgDesc struct {
 	info          *types.Info
-	typesToIdents map[types.Object]*ast.Ident
+	objectsToIdents map[types.Object]*ast.Ident
 }
 
 func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
@@ -31,10 +31,10 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
 	}
 	result := &pkgDesc{
 		info:          info,
-		typesToIdents: make(map[types.Object]*ast.Ident),
+		objectsToIdents: make(map[types.Object]*ast.Ident),
 	}
 	for k, v := range result.info.Defs {
-		result.typesToIdents[v] = k
+		result.objectsToIdents[v] = k
 	}
 	return result, nil
 }
