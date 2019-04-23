@@ -9,6 +9,7 @@ import (
 type flowNode struct {
 	statements []ast.Stmt
 	branches   []flow
+	gos        []ast.Stmt
 	defers     []ast.Stmt
 }
 
@@ -20,7 +21,7 @@ func (fl *flow) nodeToAppend() *flowNode {
 	needNew := len(fl.nodes) == 0
 	if !needNew {
 		last := fl.nodes[len(fl.nodes)-1]
-		needNew = len(last.branches) > 0 || len(last.defers) > 0
+		needNew = len(last.branches) > 0 || len(last.defers) > 0 || len(last.gos) > 0
 	}
 	if needNew {
 		fl.nodes = append(fl.nodes, flowNode{})
@@ -43,6 +44,11 @@ func (fl *flow) addDefers(defers []ast.Stmt) {
 	fn.defers = append(fn.defers, defers...)
 }
 
+func (fl *flow) addGos(gos []ast.Stmt) {
+	fn := fl.nodeToAppend()
+	fn.defers = append(fn.gos, gos...)
+}
+
 func (fl *flow) addFlow(toAdd flow) {
 	fl.nodes = append(fl.nodes, toAdd.nodes...)
 }
@@ -54,7 +60,10 @@ func buildFlow(stmt *ast.BlockStmt) flow {
 		case *ast.IfStmt:
 			result.addBranches(buildIfFlowNode(typed))
 		case *ast.SwitchStmt:
-		case *ast.TypeSwitchStmt, *ast.GoStmt, *ast.SelectStmt, *ast.RangeStmt:
+		case *ast.GoStmt:
+			result.addStatements(expressionsToStatemants(typed.Call.Args...))
+			result.addGos(expressionsToStatemants(typed.Call))
+		case *ast.TypeSwitchStmt, *ast.SelectStmt, *ast.RangeStmt:
 		case *ast.BlockStmt:
 			result.addBranches([]flow{buildFlow(typed)})
 		case *ast.DeferStmt:

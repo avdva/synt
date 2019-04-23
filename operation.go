@@ -58,25 +58,25 @@ func statementsToOpchain(statements []ast.Stmt) []opchain {
 		fmt.Println(reflect.TypeOf(statement).String())
 		switch typed := statement.(type) {
 		case *ast.AssignStmt:
-			
+
 		case *ast.ExprStmt:
-			result = append(result, checkExpr(typed))
+			result = append(result, exprToOpChain(typed))
 		}
 	}
 	return result
 }
 
-func checkExpr(expr *ast.ExprStmt) opchain {
+func exprToOpChain(expr *ast.ExprStmt) opchain {
 	var result opchain
 	switch typed := expr.X.(type) {
 	case *ast.CallExpr:
 		// TODO(avd) - check args for non-deffered calls.
-		result = append(result, exprToOpChain(typed)...)
+		result = append(result, callExprToOpChain(typed)...)
 	}
 	return result
 }
 
-func exprToOpChain(expr ast.Expr) opchain {
+func callExprToOpChain(expr ast.Expr) opchain {
 	var result opchain
 	for _, elem := range expandCallExpr(expr) {
 		typ := opRead
