@@ -12,7 +12,7 @@ import (
 
 func TestLinterParseComments(t *testing.T) {
 	a := assert.New(t)
-	l, err := New("./test/pkg1", []string{"m"})
+	l, err := New("./testdata/pkg1", []string{"m"})
 	if !a.NoError(err) {
 		return
 	}

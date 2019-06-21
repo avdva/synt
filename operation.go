@@ -4,9 +4,7 @@ package synt
 
 import (
 	"bytes"
-	"fmt"
 	"go/ast"
-	"reflect"
 )
 
 const (
@@ -31,8 +29,10 @@ func (t opType) String() string {
 }
 
 type op struct {
-	typ    opType
+	typ opType
+
 	object *ast.Ident
+	args   []ast.Expr
 }
 
 func (o op) GoString() string {
@@ -55,10 +55,14 @@ func (oc opchain) GoString() string {
 func statementsToOpchain(statements []ast.Stmt) []opchain {
 	var result []opchain
 	for _, statement := range statements {
-		fmt.Println(reflect.TypeOf(statement).String())
 		switch typed := statement.(type) {
 		case *ast.AssignStmt:
-
+			for _, rhs := range typed.Rhs {
+				result = append(result, expandLhs(rhs))
+			}
+			for _, lhs := range typed.Lhs {
+				result = append(result, expandExpr(lhs))
+			}
 		case *ast.ExprStmt:
 			result = append(result, exprToOpChain(typed))
 		}
@@ -66,54 +70,44 @@ func statementsToOpchain(statements []ast.Stmt) []opchain {
 	return result
 }
 
+func expandLhs(lhs ast.Expr) opchain {
+	chain := expandExpr(lhs)
+	return chain
+}
+
 func exprToOpChain(expr *ast.ExprStmt) opchain {
 	var result opchain
 	switch typed := expr.X.(type) {
 	case *ast.CallExpr:
-		// TODO(avd) - check args for non-deffered calls.
-		result = append(result, callExprToOpChain(typed)...)
+		result = append(result, expandExpr(typed)...)
 	}
 	return result
 }
 
-func callExprToOpChain(expr ast.Expr) opchain {
+func expandExpr(expr ast.Expr) opchain {
 	var result opchain
-	for _, elem := range expandCallExpr(expr) {
-		typ := opRead
-		if elem.call {
-			typ = opExec
-		}
-		result = append(result, op{typ: typ, object: elem.id})
-	}
-	return result
-}
-
-type callChain []callChainElem
-
-type callChainElem struct {
-	id   *ast.Ident
-	call bool
-	args []ast.Expr
-}
-
-func expandCallExpr(expr ast.Expr) callChain {
-	var result callChain
 	for expr != nil {
 		switch typed := expr.(type) {
 		case *ast.CallExpr:
 			switch fTyped := typed.Fun.(type) {
 			case *ast.Ident:
-				result = append([]callChainElem{{id: fTyped, args: typed.Args, call: true}}, result...)
+				for _, arg := range typed.Args {
+					result = append(result, expandExpr(arg)...)
+				}
+				result = append([]op{{object: fTyped, args: typed.Args, typ: opExec}}, result...)
 				expr = nil
 			case *ast.SelectorExpr:
-				result = append([]callChainElem{{id: fTyped.Sel, args: typed.Args, call: true}}, result...)
+				for _, arg := range typed.Args {
+					result = append(result, expandExpr(arg)...)
+				}
+				result = append([]op{{object: fTyped.Sel, args: typed.Args, typ: opExec}}, result...)
 				expr = fTyped.X
 			}
 		case *ast.SelectorExpr:
-			result = append([]callChainElem{{id: typed.Sel}}, result...)
+			result = append([]op{{object: typed.Sel, typ: opRead}}, result...)
 			expr = typed.X
 		case *ast.Ident:
-			result = append([]callChainElem{{id: typed}}, result...)
+			result = append([]op{{object: typed, typ: opRead}}, result...)
 			expr = nil
 		default:
 			expr = nil

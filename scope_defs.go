@@ -133,7 +133,7 @@ func parseComments(comments *ast.CommentGroup) []annotation {
 			continue
 		}
 		text = text[len(tag):]
-		result = append(result, annotation(text))
+		result = append(result, annotation(strings.TrimSpace(text)))
 	}
 	return result
 }

@@ -20,7 +20,7 @@ func (a annotation) guards() []guard {
 		if strings.HasSuffix(part, ".Lock") {
 			var g guard
 			part = strings.TrimSuffix(part, ".Lock")
-			if part[0] == '!' {
+			if len(part) > 0 && part[0] == '!' {
 				g.inverse = true
 				part = part[1:]
 			}

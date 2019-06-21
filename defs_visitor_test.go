@@ -23,11 +23,14 @@ func TestScopeVisitor(t *testing.T) {
 	zeroAstNodes(fv.defs)
 	expected := &defs{
 		vars: map[string]*varDef{
-			"a": &varDef{},
-			"b": &varDef{annotations: []annotation{"m.Lock"}},
-			"c": &varDef{annotations: []annotation{"m.Lock"}},
-			"m": &varDef{},
-			"n": &varDef{},
+			"a":  &varDef{},
+			"b":  &varDef{annotations: []annotation{"m.Lock wm.wmMut.Lock"}},
+			"c":  &varDef{annotations: []annotation{"m.Lock"}},
+			"e":  &varDef{annotations: []annotation{"em.Lock"}},
+			"em": &varDef{annotations: nil},
+			"m":  &varDef{},
+			"n":  &varDef{annotations: []annotation{"wm.wmMut.Lock"}},
+			"wm": &varDef{},
 		},
 		functions: map[string]*methodDef{
 			"init":     &methodDef{},

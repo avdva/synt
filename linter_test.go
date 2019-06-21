@@ -4,14 +4,12 @@ package synt
 
 import (
 	"log"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 var (
-	pkg0CheckInfo *CheckInfo
-	pkg1CheckInfo *CheckInfo
+	pkg0CheckInfo   *CheckInfo
+	pkg1CheckInfo   *CheckInfo
+	opTestCheckInfo *CheckInfo
 )
 
 const (
@@ -24,6 +22,10 @@ const (
 	testPkg1Folder  = "pkg1"
 	testPkg1Path    = testLocation + "/" + testPkg1Folder
 	testPkg1Package = "pkg1"
+
+	testOpFolder  = "optest"
+	testOpPath    = testLocation + "/" + testOpFolder
+	testOpPackage = "optest"
 )
 
 func init() {
@@ -32,15 +34,14 @@ func init() {
 		log.Fatal(err)
 	}
 	pkg0CheckInfo = &CheckInfo{Pkg: pkgs[testPkg0Package], Fs: fs}
-	pkgs, fs, err = parsePackage(testPkg1Path)
-	if err != nil {
+
+	if pkgs, fs, err = parsePackage(testPkg1Path); err != nil {
 		log.Fatal(err)
 	}
 	pkg1CheckInfo = &CheckInfo{Pkg: pkgs[testPkg1Package], Fs: fs}
-}
 
-func TestLinterParsePackage(t *testing.T) {
-	r := require.New(t)
-	_, err := New("./testdata/pkg0", []string{"m"})
-	r.NoError(err)
+	if pkgs, fs, err = parsePackage(testOpPath); err != nil {
+		log.Fatal(err)
+	}
+	opTestCheckInfo = &CheckInfo{Pkg: pkgs[testOpPackage], Fs: fs}
 }
