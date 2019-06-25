@@ -87,14 +87,9 @@ func statementsToOpchain(statements []ast.Stmt) opFlow {
 	for _, statement := range statements {
 		switch typed := statement.(type) {
 		case *ast.AssignStmt:
-			for _, rhs := range typed.Rhs {
-				result = append(result, expandLhs(rhs))
-			}
-			for _, lhs := range typed.Lhs {
-				result = append(result, expandExpr(lhs))
-			}
+			result = append(result, expandAssignment(typed.Lhs, typed.Rhs)...)
 		case *ast.ExprStmt:
-			result = append(result, exprToOpChain(typed))
+			result = append(result, expandExprEtmt(typed))
 		default:
 			fmt.Printf("statementsToOpchain: skipping %s\n", reflect.ValueOf(statement).Type().String())
 		}
@@ -102,12 +97,20 @@ func statementsToOpchain(statements []ast.Stmt) opFlow {
 	return result
 }
 
-func expandLhs(lhs ast.Expr) opchain {
-	chain := expandExpr(lhs)
-	return chain
+func expandAssignment(lhs, rhs []ast.Expr) opFlow {
+	var result opFlow
+	for _, rhs := range rhs {
+		result = append(result, expandExpr(rhs))
+	}
+	for _, lhs := range lhs {
+		expanded := expandExpr(lhs)
+		result = append(result, expanded)
+
+	}
+	return result
 }
 
-func exprToOpChain(expr *ast.ExprStmt) opchain {
+func expandExprEtmt(expr *ast.ExprStmt) opchain {
 	var result opchain
 	switch typed := expr.X.(type) {
 	case *ast.CallExpr:

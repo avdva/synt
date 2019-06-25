@@ -3,6 +3,7 @@
 package synt
 
 import (
+	"go/ast"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,10 +19,13 @@ func TestOperation1(t *testing.T) {
 		opchain{
 			op{typ: opRead},
 		},
+		opchain {
+			op{typ: opWrite, object: ast.NewIdent("a")},
+		},
 	}
 	// at this point we're not interested in args.
 	zeroArgs(of)
-	r.Equal(expected[:1], of[:1])
+	r.Equal(expected[:2], of[:2])
 }
 
 func zeroArgs(flow opFlow) {
