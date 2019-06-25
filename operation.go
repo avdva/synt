@@ -4,7 +4,10 @@ package synt
 
 import (
 	"bytes"
+	"fmt"
 	"go/ast"
+	"reflect"
+	"strconv"
 )
 
 const (
@@ -35,25 +38,52 @@ type op struct {
 	args   []ast.Expr
 }
 
-func (o op) GoString() string {
-	return o.typ.String() + ":" + o.object.Name
+func (o op) String() string {
+	result := o.typ.String() + ":"
+	if o.object != nil {
+		result += o.object.Name
+	}
+	if len(o.args) > 0 {
+		switch o.typ {
+		case opExec:
+			result += "(" + strconv.Itoa(len(o.args)) + ")"
+		}
+	}
+	return result
 }
 
 type opchain []op
 
-func (oc opchain) GoString() string {
+func (oc opchain) String() string {
 	var buff bytes.Buffer
 	for i, o := range oc {
 		if i != 0 {
-			buff.WriteString(",")
+			buff.WriteString("+")
 		}
-		buff.WriteString(o.GoString())
+		buff.WriteString(o.String())
 	}
 	return buff.String()
 }
 
-func statementsToOpchain(statements []ast.Stmt) []opchain {
-	var result []opchain
+type opFlow []opchain
+
+func (of opFlow) String() string {
+	var buff bytes.Buffer
+	for i, o := range of {
+		if i != 0 {
+			buff.WriteString("->")
+		}
+		if o == nil {
+			buff.WriteString("<nil>")
+		} else {
+			buff.WriteString(o.String())
+		}
+	}
+	return buff.String()
+}
+
+func statementsToOpchain(statements []ast.Stmt) opFlow {
+	var result opFlow
 	for _, statement := range statements {
 		switch typed := statement.(type) {
 		case *ast.AssignStmt:
@@ -65,6 +95,8 @@ func statementsToOpchain(statements []ast.Stmt) []opchain {
 			}
 		case *ast.ExprStmt:
 			result = append(result, exprToOpChain(typed))
+		default:
+			fmt.Printf("statementsToOpchain: skipping %s\n", reflect.ValueOf(statement).Type().String())
 		}
 	}
 	return result
@@ -109,7 +141,15 @@ func expandExpr(expr ast.Expr) opchain {
 		case *ast.Ident:
 			result = append([]op{{object: typed, typ: opRead}}, result...)
 			expr = nil
+		case *ast.IndexExpr:
+			result = append(result, expandExpr(typed.Index)...)
+			result = append(result, expandExpr(typed.X)...)
+			expr = nil
+		case *ast.BasicLit:
+			result = append(result, op{typ: opRead, args: []ast.Expr{typed}})
+			expr = nil
 		default:
+			fmt.Printf("expandExpr: skipping %s\n", reflect.ValueOf(expr).Type().String())
 			expr = nil
 		}
 	}
