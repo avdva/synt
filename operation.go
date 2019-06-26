@@ -34,14 +34,26 @@ func (t opType) String() string {
 type op struct {
 	typ opType
 
-	object *ast.Ident
+	object ast.Expr
 	args   []ast.Expr
+}
+
+func (o op) objName() string {
+	switch typed := o.object.(type) {
+	case *ast.Ident:
+		return typed.Name
+	}
+	return ""
 }
 
 func (o op) String() string {
 	result := o.typ.String() + ":"
 	if o.object != nil {
-		result += o.object.Name
+		name := o.objName()
+		if len(name) == 0 {
+			name = "<expr>"
+		}
+		result += name
 	}
 	if len(o.args) > 0 {
 		switch o.typ {

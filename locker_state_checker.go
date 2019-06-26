@@ -215,12 +215,12 @@ func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *locke
 }
 
 func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
-	for i := len(chain) - 1; i >= 0; i-- {
+	/*for i := len(chain) - 1; i >= 0; i-- {
 		op := chain[i]
 		if op.typ != opExec {
 			continue
 		}
-		act, found := opToAct[op.object.Name]
+		act, found := opToAct[op.objName()]
 		if !found || i == 0 {
 			continue
 		}
@@ -230,7 +230,7 @@ func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
 				lsc.reports = append(lsc.reports, CheckReport{Err: err, Pos: op.object.Pos()})
 			}
 		}
-	}
+	}*/
 }
 
 func objectTypeString(obj types.Object) string {
