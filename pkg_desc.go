@@ -10,7 +10,7 @@ import (
 )
 
 type pkgDesc struct {
-	info          *types.Info
+	info            *types.Info
 	objectsToIdents map[types.Object]*ast.Ident
 }
 
@@ -30,7 +30,7 @@ func makePkgDesc(pkg *ast.Package, fs *token.FileSet) (*pkgDesc, error) {
 		return nil, err
 	}
 	result := &pkgDesc{
-		info:          info,
+		info:            info,
 		objectsToIdents: make(map[types.Object]*ast.Ident),
 	}
 	for k, v := range result.info.Defs {

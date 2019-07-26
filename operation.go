@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"go/ast"
 	"reflect"
-	"strconv"
 )
 
 const (
-	opRead opType = iota
-	opWrite
+	opR opType = iota
+	opW
 	opExec
 )
 
@@ -20,61 +19,20 @@ type opType int
 
 func (t opType) String() string {
 	switch t {
-	case opRead:
-		return "read"
-	case opWrite:
-		return "write"
+	case opR:
+		return "r"
+	case opW:
+		return "w"
 	case opExec:
-		return "exec"
+		return "e"
 	default:
 		return "unknown"
 	}
 }
 
-type op struct {
-	typ opType
-
-	object ast.Expr
-	args   []ast.Expr
-}
-
-func (o op) objName() string {
-	switch typed := o.object.(type) {
-	case *ast.Ident:
-		return typed.Name
-	}
-	return ""
-}
-
-func (o op) String() string {
-	result := o.typ.String() + ":"
-	if o.object != nil {
-		name := o.objName()
-		if len(name) == 0 {
-			name = "<expr>"
-		}
-		result += name
-	}
-	if len(o.args) > 0 {
-		switch o.typ {
-		case opExec:
-			result += "(" + strconv.Itoa(len(o.args)) + ")"
-		}
-	}
-	return result
-}
-
-type opchain []op
-
-func (oc opchain) String() string {
-	var buff bytes.Buffer
-	for i, o := range oc {
-		if i != 0 {
-			buff.WriteString("+")
-		}
-		buff.WriteString(o.String())
-	}
-	return buff.String()
+type operation interface {
+	ObjectName() string
+	String() string
 }
 
 type opFlow []opchain
@@ -83,7 +41,7 @@ func (of opFlow) String() string {
 	var buff bytes.Buffer
 	for i, o := range of {
 		if i != 0 {
-			buff.WriteString("->")
+			buff.WriteString("→")
 		}
 		if o == nil {
 			buff.WriteString("<nil>")
@@ -101,7 +59,9 @@ func statementsToOpchain(statements []ast.Stmt) opFlow {
 		case *ast.AssignStmt:
 			result = append(result, expandAssignment(typed.Lhs, typed.Rhs)...)
 		case *ast.ExprStmt:
-			result = append(result, expandExprEtmt(typed))
+			result = append(result, expandExprStmt(typed))
+		case *ast.IncDecStmt:
+			result = append(result, expandIncDec(typed)...)
 		default:
 			fmt.Printf("statementsToOpchain: skipping %s\n", reflect.ValueOf(statement).Type().String())
 		}
@@ -109,20 +69,37 @@ func statementsToOpchain(statements []ast.Stmt) opFlow {
 	return result
 }
 
-func expandAssignment(lhs, rhs []ast.Expr) opFlow {
+func expandIncDec(stmt *ast.IncDecStmt) opFlow {
 	var result opFlow
-	for _, rhs := range rhs {
-		result = append(result, expandExpr(rhs))
-	}
-	for _, lhs := range lhs {
-		expanded := expandExpr(lhs)
-		result = append(result, expanded)
-
+	expanded := expandExpr(stmt.X)
+	if len(expanded) > 1 {
+		result = append(result, expanded[:len(expanded)-1])
 	}
 	return result
 }
 
-func expandExprEtmt(expr *ast.ExprStmt) opchain {
+func expandAssignment(lhs, rhs []ast.Expr) opFlow {
+	var result opFlow
+	var writes []wOp
+	for _, lhs := range lhs {
+		expanded := expandExpr(lhs)
+		if len(expanded) > 1 {
+			result = append(result, expanded[:len(expanded)-1])
+		}
+		writes = append(writes, wOp{lhs: cleanAccessExpr(expanded)})
+	}
+	for i, rhs := range rhs {
+		expanded := expandExpr(rhs)
+		result = append(result, expanded)
+		writes[i].rhs = expanded
+	}
+	for i := range writes {
+		result = append(result, []operation{&writes[i]})
+	}
+	return result
+}
+
+func expandExprStmt(expr *ast.ExprStmt) opchain {
 	var result opchain
 	switch typed := expr.X.(type) {
 	case *ast.CallExpr:
@@ -136,32 +113,47 @@ func expandExpr(expr ast.Expr) opchain {
 	for expr != nil {
 		switch typed := expr.(type) {
 		case *ast.CallExpr:
+			op := &execOp{fun: typed.Fun}
+			for _, arg := range typed.Args {
+				expanded := expandExpr(arg)
+				result = append(result, expanded...)
+				op.args = append(op.args, expanded)
+			}
 			switch fTyped := typed.Fun.(type) {
+			case *ast.FuncLit:
+				expr = nil
 			case *ast.Ident:
-				for _, arg := range typed.Args {
-					result = append(result, expandExpr(arg)...)
-				}
-				result = append([]op{{object: fTyped, args: typed.Args, typ: opExec}}, result...)
 				expr = nil
 			case *ast.SelectorExpr:
-				for _, arg := range typed.Args {
-					result = append(result, expandExpr(arg)...)
-				}
-				result = append([]op{{object: fTyped.Sel, args: typed.Args, typ: opExec}}, result...)
 				expr = fTyped.X
 			}
+			result = append(result, op)
 		case *ast.SelectorExpr:
-			result = append([]op{{object: typed.Sel, typ: opRead}}, result...)
+			result = append([]operation{newROpIdent(typed.Sel)}, result...)
 			expr = typed.X
 		case *ast.Ident:
-			result = append([]op{{object: typed, typ: opRead}}, result...)
+			result = append([]operation{newROpIdent(typed)}, result...)
 			expr = nil
 		case *ast.IndexExpr:
-			result = append(result, expandExpr(typed.Index)...)
-			result = append(result, expandExpr(typed.X)...)
+			indexExpanded := expandExpr(typed.Index)
+			xExpanded := expandExpr(typed.X)
+			result = append(result, indexExpanded...)
+			result = append(result, xExpanded...)
+			result = append(result, &execOp{
+				args: []opchain{xExpanded, indexExpanded},
+				fun:  ast.NewIdent("__indexaccess"),
+			})
 			expr = nil
 		case *ast.BasicLit:
-			result = append(result, op{typ: opRead, args: []ast.Expr{typed}})
+			result = append([]operation{newROpBasicLit(typed)}, result...)
+			expr = nil
+		case *ast.StarExpr:
+			xExpanded := expandExpr(typed.X)
+			result = append(result, xExpanded...)
+			result = append(result, &execOp{
+				args: []opchain{xExpanded},
+				fun:  ast.NewIdent("__ptraccess"),
+			})
 			expr = nil
 		default:
 			fmt.Printf("expandExpr: skipping %s\n", reflect.ValueOf(expr).Type().String())
@@ -169,4 +161,17 @@ func expandExpr(expr ast.Expr) opchain {
 		}
 	}
 	return result
+}
+
+func exprName(expr ast.Expr) string {
+	name := "<expr>"
+	switch typed := expr.(type) {
+	case *ast.Ident:
+		name = typed.Name
+	case *ast.SelectorExpr:
+		name = typed.Sel.Name
+	case *ast.BasicLit:
+		name = typed.Value
+	}
+	return name
 }

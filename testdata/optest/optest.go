@@ -16,6 +16,14 @@ func getPtr(arg int) *int {
 	return &arg
 }
 
+func getSlice(_ struct{}) []int {
+	return nil
+}
+
+func getSlice2(_ struct{}) []int {
+	return nil
+}
+
 type str struct {
 	m sync.RWMutex
 }
@@ -27,11 +35,14 @@ func f1() {
 	a := 5
 	sl[i] = 8
 	sl[i] = a
+	sl[sl[i]] = getSlice2(struct{}{})[getSlice(struct{}{})[0]]
+	*getPtr(3) = getInt2(a)
+	a++
 	b, c := a, sl[i]
+	a = b + (c * b)
 	a = sl[getInt()]
-	a, a = b, c
 	a = getInt2(2)
-	a = *getPtr(a)
-	*getPtr(3) = 8
+	a = *getPtr(c)
+	getSlice(struct{}{})[*getPtr(3)] = b
 	s.m.Lock()
 }
