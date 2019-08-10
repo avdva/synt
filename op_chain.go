@@ -2,18 +2,19 @@
 
 package synt
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+)
 
 type opchain []operation
 
 func (oc opchain) String() string {
-	if len(oc) == 1 {
-		if wop, ok := oc[0].(*wOp); ok {
-			return wop.String()
-		}
-	}
 	var parts []string
 	for _, o := range oc {
+		if len(o.String()) == 0 {
+			panic(reflect.TypeOf(o).String())
+		}
 		parts = append(parts, o.String())
 	}
 	return strings.Join(parts, "+")

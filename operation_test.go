@@ -41,8 +41,8 @@ func TestOperation1(t *testing.T) {
 					&execOp{
 						fun: ast.NewIdent("__indexaccess"),
 						args: []opchain{
-							opchain{&rOp{ast.NewIdent("sl")}},
 							opchain{&rOp{ast.NewIdent("i")}},
+							opchain{&rOp{ast.NewIdent("sl")}},
 						},
 					},
 				},
@@ -62,8 +62,8 @@ func TestOperation1(t *testing.T) {
 					&execOp{
 						fun: ast.NewIdent("__indexaccess"),
 						args: []opchain{
-							opchain{newROpIdent(ast.NewIdent("sl"))},
 							opchain{newROpIdent(ast.NewIdent("i"))},
+							opchain{newROpIdent(ast.NewIdent("sl"))},
 						},
 					},
 				},
@@ -76,12 +76,13 @@ func TestOperation1(t *testing.T) {
 			&execOp{
 				fun: ast.NewIdent("__indexaccess"),
 				args: []opchain{
-					opchain{newROpIdent(ast.NewIdent("sl"))},
 					opchain{newROpIdent(ast.NewIdent("i"))},
+					opchain{newROpIdent(ast.NewIdent("sl"))},
 				},
 			},
 			newROpIdent(ast.NewIdent("sl")),
 		},
+		// sl[sl[i]] = getSlice2(struct{}{})[getSlice(struct{}{})[0]]
 		opchain{
 			newROpBasicLit(&ast.BasicLit{Value: "0"}),
 			&execOp{
@@ -131,8 +132,9 @@ func TestOperation1(t *testing.T) {
 func compareOpFlows(expected, given opFlow) error {
 	var i int
 	for i = 0; i < intMin(len(expected), len(given)); i++ {
-		if expected[i].String() != given[i].String() {
-			return errors.Errorf("expected, given: %s != %s", expected[i].String(), given[i].String())
+		expectedStr, gotStr := expected[i].String(), flatten(given[i], -1).String()
+		if expectedStr != gotStr {
+			return errors.Errorf("expected, given: %s != %s", expectedStr, gotStr)
 		}
 	}
 	if i < len(expected) {

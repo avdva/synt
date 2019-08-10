@@ -7,7 +7,7 @@ type wOp struct {
 	rhs opchain
 }
 
-func (op *wOp) typ() opType {
+func (op *wOp) Type() opType {
 	return opW
 }
 
@@ -16,7 +16,7 @@ func (o wOp) ObjectName() string {
 }
 
 func (o wOp) String() string {
-	result := o.typ().String() + ":"
+	result := o.Type().String() + ":"
 	result += "(" + o.lhs.ObjectName() + "=" + o.rhs.ObjectName() + ")"
 	return result
 }

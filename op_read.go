@@ -16,7 +16,7 @@ func newROpBasicLit(lit *ast.BasicLit) *rOp {
 	return &rOp{expr: lit}
 }
 
-func (op *rOp) typ() opType {
+func (op *rOp) Type() opType {
 	return opR
 }
 
@@ -25,6 +25,6 @@ func (o rOp) ObjectName() string {
 }
 
 func (o rOp) String() string {
-	result := o.typ().String() + ":" + o.ObjectName()
+	result := o.Type().String() + ":" + o.ObjectName()
 	return result
 }
