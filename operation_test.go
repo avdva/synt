@@ -17,7 +17,9 @@ func TestOperation1(t *testing.T) {
 	defs := buildDefs(opTestCheckInfo.Pkg.Files)
 	fdef := defs.functions["f1"]
 	r.NotNil(fdef)
-	of := statementsToOpchain(fdef.node.Body.List)
+	desc, err := makePkgDesc(opTestCheckInfo.Pkg, opTestCheckInfo.Fs)
+	r.NoError(err)
+	of := statementsToOpchain(fdef.node.Body.List, desc.info.Uses)
 	expected := opFlow{
 		opchain{
 			newROpBasicLit(&ast.BasicLit{Value: "5"}),

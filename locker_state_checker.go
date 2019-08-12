@@ -181,7 +181,7 @@ func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
 
 func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
 	for _, node := range fl.nodes {
-		chains := statementsToOpchain(node.statements)
+		chains := statementsToOpchain(node.statements, lsc.desc.info.Uses)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
@@ -199,7 +199,7 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *lockerStates {
 	for i := len(fl.nodes) - 1; i >= 0; i-- {
 		node := fl.nodes[i]
-		chains := statementsToOpchain(node.defers)
+		chains := statementsToOpchain(node.defers, lsc.desc.info.Uses)
 		for _, chain := range chains {
 			lsc.checkChain(states, chain)
 		}
@@ -215,12 +215,12 @@ func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *locke
 }
 
 func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
-	/*for i := len(chain) - 1; i >= 0; i-- {
+	for i := len(chain) - 1; i >= 0; i-- {
 		op := chain[i]
-		if op.typ != opExec {
+		if op.Type() != opExec {
 			continue
 		}
-		act, found := opToAct[op.objName()]
+		act, found := opToAct[op.ObjectName()]
 		if !found || i == 0 {
 			continue
 		}
@@ -230,7 +230,7 @@ func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
 				lsc.reports = append(lsc.reports, CheckReport{Err: err, Pos: op.object.Pos()})
 			}
 		}
-	}*/
+	}
 }
 
 func objectTypeString(obj types.Object) string {
