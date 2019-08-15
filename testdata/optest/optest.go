@@ -32,17 +32,15 @@ func f1() {
 	var i int
 	var sl []int
 	var s str
+	var b, c int
 	a := 5
 	sl[i] = 8
 	sl[i] = a
 	sl[sl[i]] = getSlice2(struct{}{})[getSlice(struct{}{})[0]]
 	*getPtr(3) = getInt2(a)
-	a++
-	b, c := a, sl[i]
-	a = b + (c * b)
-	a = sl[getInt()]
-	a = getInt2(2)
 	a = *getPtr(c)
+	a++
+	a = b + (c * b)
 	getSlice(struct{}{})[*getPtr(3)] = b
 	s.m.Lock()
 }

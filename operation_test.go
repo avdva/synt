@@ -41,8 +41,8 @@ func TestOperation1(t *testing.T) {
 			&wOp{
 				lhs: opchain{
 					&indexOp{
-						index: opchain{&rOp{ast.NewIdent("i")}},
-						x:     opchain{&rOp{ast.NewIdent("sl")}},
+						index: opchain{newROpIdent(ast.NewIdent("i"))},
+						x:     opchain{newROpIdent(ast.NewIdent("sl"))},
 					},
 				},
 				rhs: opchain{newROpBasicLit(&ast.BasicLit{Value: "8"})},
@@ -59,8 +59,8 @@ func TestOperation1(t *testing.T) {
 			&wOp{
 				lhs: opchain{
 					&indexOp{
-						index: opchain{&rOp{ast.NewIdent("i")}},
-						x:     opchain{&rOp{ast.NewIdent("sl")}},
+						index: opchain{newROpIdent(ast.NewIdent("i"))},
+						x:     opchain{newROpIdent(ast.NewIdent("sl"))},
 					},
 				},
 				rhs: opchain{newROpIdent(ast.NewIdent("a"))},
@@ -72,8 +72,8 @@ func TestOperation1(t *testing.T) {
 			newROpIdent(ast.NewIdent("i")),
 			newROpIdent(ast.NewIdent("sl")),
 			&indexOp{
-				index: opchain{&rOp{ast.NewIdent("i")}},
-				x:     opchain{&rOp{ast.NewIdent("sl")}},
+				index: opchain{newROpIdent(ast.NewIdent("i"))},
+				x:     opchain{newROpIdent(ast.NewIdent("sl"))},
 			},
 			newROpIdent(ast.NewIdent("sl")),
 		},
@@ -137,49 +137,15 @@ func TestOperation1(t *testing.T) {
 		opchain{
 			&wOp{
 				lhs: opchain{
-					newROpIdent(ast.NewIdent("i")),
-					newROpIdent(ast.NewIdent("sl")),
 					&indexOp{
-						index: opchain{&rOp{ast.NewIdent("i")}},
-						x:     opchain{&rOp{ast.NewIdent("sl")}},
+						index: opchain{&indexOp{
+							index: opchain{newROpIdent(ast.NewIdent("i"))},
+							x:     opchain{newROpIdent(ast.NewIdent("sl"))},
+						}},
+						x: opchain{&rOp{ast.NewIdent("sl")}},
 					},
-					newROpIdent(ast.NewIdent("sl")),
 				},
 				rhs: opchain{
-					newROpBasicLit(&ast.BasicLit{Value: "0"}),
-					&newOp{
-						typ: &ast.StructType{},
-					},
-					&execOp{
-						fun: ast.NewIdent("getSlice"),
-						args: []opchain{
-							opchain{&newOp{
-								typ: &ast.StructType{},
-							}},
-						},
-					},
-					&indexOp{
-						index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
-						x: opchain{&execOp{
-							fun: ast.NewIdent("getSlice"),
-							args: []opchain{
-								opchain{&newOp{
-									typ: &ast.StructType{},
-								}},
-							},
-						}},
-					},
-					&newOp{
-						typ: &ast.StructType{},
-					},
-					&execOp{
-						fun: ast.NewIdent("getSlice2"),
-						args: []opchain{
-							opchain{&newOp{
-								typ: &ast.StructType{},
-							}},
-						},
-					},
 					&indexOp{
 						index: opchain{&indexOp{
 							index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
@@ -206,10 +172,28 @@ func TestOperation1(t *testing.T) {
 		},
 		opchain{
 			newROpIdent(ast.NewIdent("a")),
+			&execOp{
+				fun: ast.NewIdent("getInt2"),
+				args: []opchain{
+					opchain{newROpIdent(ast.NewIdent("a"))},
+				},
+			},
+		},
+		opchain{
+			&derefOp{
+				x: opchain{
+					&execOp{
+						fun: ast.NewIdent("getPtr"),
+						args: []opchain{
+							opchain{newROpIdent(ast.NewIdent("c"))},
+						},
+					},
+				},
+			},
 		},
 	}
-	fmt.Println(of[:12])
-	r.NoError(compareOpFlows(expected[:11], of[:11]))
+	fmt.Println(of[13])
+	r.NoError(compareOpFlows(expected[:13], of[:13]))
 }
 
 func compareOpFlows(expected, given opFlow) error {

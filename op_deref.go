@@ -23,5 +23,5 @@ func (op derefOp) ObjectName() string {
 }
 
 func (op derefOp) String() string {
-	return op.Type().String() + ":" + op.ObjectName()
+	return op.Type().String() + ":" + "*(" + op.x.String() + ")"
 }
