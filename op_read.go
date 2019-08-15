@@ -2,7 +2,10 @@
 
 package synt
 
-import "go/ast"
+import (
+	"go/ast"
+	"go/token"
+)
 
 type rOp struct {
 	expr ast.Expr
@@ -14,6 +17,10 @@ func newROpIdent(ident *ast.Ident) *rOp {
 
 func newROpBasicLit(lit *ast.BasicLit) *rOp {
 	return &rOp{expr: lit}
+}
+
+func (op rOp) Pos() token.Pos {
+	return op.expr.Pos()
 }
 
 func (op *rOp) Type() opType {

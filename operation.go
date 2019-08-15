@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"reflect"
 )
@@ -35,6 +36,7 @@ type operation interface {
 	Type() opType
 	ObjectName() string
 	String() string
+	Pos() token.Pos
 }
 
 type opFlow []opchain
@@ -71,6 +73,7 @@ func statementToOpchain(statement ast.Stmt, idents map[*ast.Ident]types.Object) 
 		result = append(result, expandExprStmt(typed, idents)...)
 	case *ast.IncDecStmt:
 		result = append(result, expandIncDec(typed, idents)...)
+	case nil:
 	default:
 		fmt.Printf("statementToOpchain: skipping %s\n", reflect.ValueOf(statement).Type().String())
 	}
@@ -122,21 +125,25 @@ func expandExpr(expr ast.Expr, idents map[*ast.Ident]types.Object) opchain {
 		switch typed := expr.(type) {
 		case *ast.CallExpr:
 			var isNew bool
+			var funcNode ast.Expr
 			switch fTyped := typed.Fun.(type) {
 			case *ast.FuncLit:
 				expr = nil
+				funcNode = fTyped
 			case *ast.Ident:
 				isNew = isNewObjectFunc(fTyped, idents)
+				funcNode = fTyped
 				expr = nil
 			case *ast.SelectorExpr:
 				isNew = isNewObjectFunc(fTyped.Sel, idents)
+				funcNode = fTyped.Sel
 				expr = fTyped.X
 			}
 			var op operation
 			if isNew {
 				op = &newOp{typ: typed.Args[0]}
 			} else {
-				eop := &execOp{fun: typed.Fun}
+				eop := &execOp{fun: funcNode}
 				for _, arg := range typed.Args {
 					eop.args = append(eop.args, expandExpr(arg, idents))
 				}

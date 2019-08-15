@@ -307,16 +307,9 @@ func TestFunc15(t *testing.T) {
 	doTypFuncTest(t, expected, "./test/pkg1", "pkg1", "Type1", "func15")
 }
 
-func TestCandle(t *testing.T) {
-	expected := []error{
-		&invalidActError{subject: "sourceExists", object: "sd.m", action: 1, reason: "annotation"},
-	}
-	doTypFuncTest(t, expected, "/home/avd/dev/godev/src/olymptrade.com/olymp-candle-service/processor", "dispatcher", "SourceDispatcher", "sourceExists")
-}
-
 func doTypFuncTest(t *testing.T, expected []error, path, pkg, typ, fun string) {
 	a := assert.New(t)
-	l, err := New("./test/pkg1", []string{"m"})
+	l, err := New("./testdata/pkg1", []string{"m"})
 	if !a.NoError(err) {
 		return
 	}

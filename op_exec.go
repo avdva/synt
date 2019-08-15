@@ -4,6 +4,7 @@ package synt
 
 import (
 	"go/ast"
+	"go/token"
 	"strings"
 )
 
@@ -17,7 +18,15 @@ func (op *execOp) Type() opType {
 }
 
 func (o execOp) ObjectName() string {
-	result := exprName(o.fun)
+	return exprName(o.fun)
+}
+
+func (op execOp) Pos() token.Pos {
+	return op.fun.Pos()
+}
+
+func (o execOp) String() string {
+	result := o.Type().String() + ":" + o.ObjectName()
 	if len(o.args) > 0 {
 		var args []string
 		for _, arg := range o.args {
@@ -28,8 +37,12 @@ func (o execOp) ObjectName() string {
 	return result
 }
 
-func (o execOp) String() string {
-	return o.Type().String() + ":" + o.ObjectName()
+func (op execOp) flatten() []opchain {
+	return op.args
+}
+
+type flattenable interface {
+	flatten() []opchain
 }
 
 func flatten(chain opchain, level int) opchain {
@@ -40,10 +53,9 @@ func flatten(chain opchain, level int) opchain {
 			if newLevel > 0 {
 				newLevel--
 			}
-			switch typed := op.(type) {
-			case *execOp:
-				for _, arg := range typed.args {
-					result = append(result, flatten(arg, newLevel)...)
+			if fl, ok := op.(flattenable); ok {
+				for _, ch := range fl.flatten() {
+					result = append(result, flatten(ch, newLevel)...)
 				}
 			}
 		}

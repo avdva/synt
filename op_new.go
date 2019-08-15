@@ -4,11 +4,16 @@ package synt
 
 import (
 	"go/ast"
+	"go/token"
 )
 
 type newOp struct {
 	typ   ast.Expr
 	inits []opchain
+}
+
+func (op newOp) Pos() token.Pos {
+	return token.NoPos
 }
 
 func (op newOp) Type() opType {

@@ -2,9 +2,15 @@
 
 package synt
 
+import "go/token"
+
 type indexOp struct {
 	x     opchain
 	index opchain
+}
+
+func (op indexOp) Pos() token.Pos {
+	return op.x[len(op.x)-1].Pos()
 }
 
 func (op indexOp) Type() opType {
@@ -17,4 +23,8 @@ func (op indexOp) ObjectName() string {
 
 func (op indexOp) String() string {
 	return op.Type().String() + ":" + op.ObjectName()
+}
+
+func (op indexOp) flatten() []opchain {
+	return []opchain{op.index, op.x}
 }

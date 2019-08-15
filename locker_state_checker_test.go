@@ -104,11 +104,8 @@ func TestLockerStateCheckerDefferedIfUnlock(t *testing.T) {
 
 func TestLockerStateCheckerGuardedAccess(t *testing.T) {
 	r := require.New(t)
-	path := strings.Join([]string{testPkg0Path, "main.go"}, "/")
-	expected := []Report{
-		{Location: path + ":94:10", Err: "cannot \"lock\"  [already ?locked]"},
-		{Location: path + ":96:11", Err: "cannot \"runlock\"  [locked]"},
-	}
+	//path := strings.Join([]string{testPkg0Path, "main.go"}, "/")
+	expected := []Report(nil)
 	testFuncLSC(r, pkg0CheckInfo, "guardedAccess", expected)
 }
 

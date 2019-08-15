@@ -2,9 +2,15 @@
 
 package synt
 
+import "go/token"
+
 type wOp struct {
 	lhs opchain
 	rhs opchain
+}
+
+func (op wOp) Pos() token.Pos {
+	return token.NoPos
 }
 
 func (op *wOp) Type() opType {

@@ -3,7 +3,6 @@
 package synt
 
 import (
-	"reflect"
 	"strings"
 )
 
@@ -12,9 +11,6 @@ type opchain []operation
 func (oc opchain) String() string {
 	var parts []string
 	for _, o := range oc {
-		if len(o.String()) == 0 {
-			panic(reflect.TypeOf(o).String())
-		}
 		parts = append(parts, o.String())
 	}
 	return strings.Join(parts, "+")

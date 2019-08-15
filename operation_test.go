@@ -40,12 +40,9 @@ func TestOperation1(t *testing.T) {
 		opchain{
 			&wOp{
 				lhs: opchain{
-					&execOp{
-						fun: ast.NewIdent("__indexaccess"),
-						args: []opchain{
-							opchain{&rOp{ast.NewIdent("i")}},
-							opchain{&rOp{ast.NewIdent("sl")}},
-						},
+					&indexOp{
+						index: opchain{&rOp{ast.NewIdent("i")}},
+						x:     opchain{&rOp{ast.NewIdent("sl")}},
 					},
 				},
 				rhs: opchain{newROpBasicLit(&ast.BasicLit{Value: "8"})},
@@ -61,74 +58,158 @@ func TestOperation1(t *testing.T) {
 		opchain{
 			&wOp{
 				lhs: opchain{
-					&execOp{
-						fun: ast.NewIdent("__indexaccess"),
-						args: []opchain{
-							opchain{newROpIdent(ast.NewIdent("i"))},
-							opchain{newROpIdent(ast.NewIdent("sl"))},
-						},
+					&indexOp{
+						index: opchain{&rOp{ast.NewIdent("i")}},
+						x:     opchain{&rOp{ast.NewIdent("sl")}},
 					},
 				},
 				rhs: opchain{newROpIdent(ast.NewIdent("a"))},
 			},
 		},
+
+		// sl[sl[i]] = getSlice2(struct{}{})[getSlice(struct{}{})[0]]
 		opchain{
 			newROpIdent(ast.NewIdent("i")),
 			newROpIdent(ast.NewIdent("sl")),
-			&execOp{
-				fun: ast.NewIdent("__indexaccess"),
-				args: []opchain{
-					opchain{newROpIdent(ast.NewIdent("i"))},
-					opchain{newROpIdent(ast.NewIdent("sl"))},
-				},
+			&indexOp{
+				index: opchain{&rOp{ast.NewIdent("i")}},
+				x:     opchain{&rOp{ast.NewIdent("sl")}},
 			},
 			newROpIdent(ast.NewIdent("sl")),
 		},
-		// sl[sl[i]] = getSlice2(struct{}{})[getSlice(struct{}{})[0]]
 		opchain{
 			newROpBasicLit(&ast.BasicLit{Value: "0"}),
+			&newOp{
+				typ: &ast.StructType{},
+			},
 			&execOp{
 				fun: ast.NewIdent("getSlice"),
 				args: []opchain{
-					opchain{newROpIdent(ast.NewIdent("_"))},
+					opchain{&newOp{
+						typ: &ast.StructType{},
+					}},
 				},
 			},
-
-			&execOp{
-				fun: ast.NewIdent("__indexaccess"),
-				args: []opchain{
-					opchain{&execOp{
-						fun: ast.NewIdent("getSlice"),
-						args: []opchain{
-							opchain{&rOp{ast.NewIdent("_")}},
-						},
-					}},
-					opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
-				},
+			&indexOp{
+				index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
+				x: opchain{&execOp{
+					fun: ast.NewIdent("getSlice"),
+					args: []opchain{
+						opchain{&newOp{
+							typ: &ast.StructType{},
+						}},
+					},
+				}},
 			},
-
-			&execOp{
-				fun: ast.NewIdent("__indexaccess"),
-				args: []opchain{
-					opchain{&execOp{
-						fun: ast.NewIdent("getSlice2"),
-						args: []opchain{
-							opchain{newROpIdent(ast.NewIdent("_"))},
-						},
-					}},
-					opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
-				},
+			&newOp{
+				typ: &ast.StructType{},
 			},
 			&execOp{
 				fun: ast.NewIdent("getSlice2"),
 				args: []opchain{
-					opchain{newROpIdent(ast.NewIdent("_"))},
+					opchain{&newOp{
+						typ: &ast.StructType{},
+					}},
+				},
+			},
+			&indexOp{
+				index: opchain{&indexOp{
+					index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
+					x: opchain{&execOp{
+						fun: ast.NewIdent("getSlice"),
+						args: []opchain{
+							opchain{&newOp{
+								typ: &ast.StructType{},
+							}},
+						},
+					}},
+				}},
+				x: opchain{&execOp{
+					fun: ast.NewIdent("getSlice2"),
+					args: []opchain{
+						opchain{&newOp{
+							typ: &ast.StructType{},
+						}},
+					},
+				}},
+			},
+		},
+		opchain{
+			&wOp{
+				lhs: opchain{
+					newROpIdent(ast.NewIdent("i")),
+					newROpIdent(ast.NewIdent("sl")),
+					&indexOp{
+						index: opchain{&rOp{ast.NewIdent("i")}},
+						x:     opchain{&rOp{ast.NewIdent("sl")}},
+					},
+					newROpIdent(ast.NewIdent("sl")),
+				},
+				rhs: opchain{
+					newROpBasicLit(&ast.BasicLit{Value: "0"}),
+					&newOp{
+						typ: &ast.StructType{},
+					},
+					&execOp{
+						fun: ast.NewIdent("getSlice"),
+						args: []opchain{
+							opchain{&newOp{
+								typ: &ast.StructType{},
+							}},
+						},
+					},
+					&indexOp{
+						index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
+						x: opchain{&execOp{
+							fun: ast.NewIdent("getSlice"),
+							args: []opchain{
+								opchain{&newOp{
+									typ: &ast.StructType{},
+								}},
+							},
+						}},
+					},
+					&newOp{
+						typ: &ast.StructType{},
+					},
+					&execOp{
+						fun: ast.NewIdent("getSlice2"),
+						args: []opchain{
+							opchain{&newOp{
+								typ: &ast.StructType{},
+							}},
+						},
+					},
+					&indexOp{
+						index: opchain{&indexOp{
+							index: opchain{newROpBasicLit(&ast.BasicLit{Value: "0"})},
+							x: opchain{&execOp{
+								fun: ast.NewIdent("getSlice"),
+								args: []opchain{
+									opchain{&newOp{
+										typ: &ast.StructType{},
+									}},
+								},
+							}},
+						}},
+						x: opchain{&execOp{
+							fun: ast.NewIdent("getSlice2"),
+							args: []opchain{
+								opchain{&newOp{
+									typ: &ast.StructType{},
+								}},
+							},
+						}},
+					},
 				},
 			},
 		},
+		opchain{
+			newROpIdent(ast.NewIdent("a")),
+		},
 	}
-	fmt.Println(of[:10])
-	r.NoError(compareOpFlows(expected[:10], of[:10]))
+	fmt.Println(of[:12])
+	r.NoError(compareOpFlows(expected[:11], of[:11]))
 }
 
 func compareOpFlows(expected, given opFlow) error {

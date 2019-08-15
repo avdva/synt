@@ -94,17 +94,6 @@ func (lsc *lockerStateChecker) lockerTypeNeeded(typ string) bool {
 	return needed
 }
 
-func (lsc *lockerStateChecker) idForIdent(id *ast.Ident) string {
-	obj := lsc.desc.info.Uses[id]
-	if obj == nil {
-		return ""
-	}
-	if _, needed := lsc.types[objectTypeString(obj)]; !needed {
-		return ""
-	}
-	return lsc.ids.strID(obj)
-}
-
 func (lsc *lockerStateChecker) buildGuards() {
 	for _, varDef := range lsc.defs.vars {
 		if guards := lsc.guardsFromAnnotations(nil, varDef.annotations); len(guards) > 0 {
@@ -148,7 +137,7 @@ func (lsc *lockerStateChecker) resolveDotExpr(id *ast.Ident, de dotExpr) *ast.Id
 		if def == nil {
 			return nil
 		}
-		obj := resolveObjectField(def, de.part(i))
+		obj, _ := structFieldObjectByName(def, de.part(i))
 		if obj == nil {
 			return nil
 		}
@@ -172,23 +161,42 @@ func (lsc *lockerStateChecker) checkFunctions() {
 	}
 }
 
-func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
-	fl := buildFlow(def.node.Body)
-	states := newLockerStates()
-	lsc.checkFlow(fl, states)
-	lsc.checkDefers(fl, states)
+func (lsc *lockerStateChecker) addGlobals(or *objectResolver) {
+	for _, def := range lsc.defs.vars {
+		if obj := lsc.desc.info.Defs[def.node]; obj != nil {
+			or.addObject(def.node.Name, obj)
+		}
+	}
 }
 
-func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerStates {
+func (lsc *lockerStateChecker) checkFunction(name string, def *methodDef) {
+	or := new(objectResolver)
+	or.push()
+	lsc.addGlobals(or)
+	or.push()
+	if def.node.Recv != nil {
+		id := def.node.Recv.List[0].Names[0]
+		obj := lsc.desc.info.Defs[id]
+		or.addObject(id.Name, obj)
+	}
+	fl := buildFlow(def.node.Body)
+	states := newLockerStates()
+	lsc.checkFlow(fl, states, or)
+	lsc.checkDefers(fl, states, or)
+}
+
+func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates, or *objectResolver) *lockerStates {
 	for _, node := range fl.nodes {
 		chains := statementsToOpchain(node.statements, lsc.desc.info.Uses)
 		for _, chain := range chains {
-			lsc.checkChain(states, chain)
+			lsc.checkChain(states, chain, or)
 		}
 		if len(node.branches) > 0 {
 			var branchStates []*lockerStates
 			for _, flow := range node.branches {
-				branchStates = append(branchStates, lsc.checkFlow(flow, copyLockerStates(states)))
+				or.push()
+				branchStates = append(branchStates, lsc.checkFlow(flow, copyLockerStates(states), or))
+				or.pop()
 			}
 			states = mergeStates(branchStates)
 		}
@@ -196,17 +204,17 @@ func (lsc *lockerStateChecker) checkFlow(fl flow, states *lockerStates) *lockerS
 	return states
 }
 
-func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *lockerStates {
+func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates, or *objectResolver) *lockerStates {
 	for i := len(fl.nodes) - 1; i >= 0; i-- {
 		node := fl.nodes[i]
 		chains := statementsToOpchain(node.defers, lsc.desc.info.Uses)
 		for _, chain := range chains {
-			lsc.checkChain(states, chain)
+			lsc.checkChain(states, chain, or)
 		}
 		if len(node.branches) > 0 {
 			var branchStates []*lockerStates
 			for _, flow := range node.branches {
-				branchStates = append(branchStates, lsc.checkDefers(flow, copyLockerStates(states)))
+				branchStates = append(branchStates, lsc.checkDefers(flow, copyLockerStates(states), or))
 			}
 			states = mergeStates(branchStates)
 		}
@@ -214,7 +222,7 @@ func (lsc *lockerStateChecker) checkDefers(fl flow, states *lockerStates) *locke
 	return states
 }
 
-func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
+func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain, or *objectResolver) {
 	for i := len(chain) - 1; i >= 0; i-- {
 		op := chain[i]
 		if op.Type() != opExec {
@@ -224,61 +232,16 @@ func (lsc *lockerStateChecker) checkChain(states *lockerStates, chain opchain) {
 		if !found || i == 0 {
 			continue
 		}
-		obj := chain[i-1].object // object, on which the operation is performed
-		if id := lsc.idForIdent(obj); len(id) > 0 {
+		toResolve := chain[:i]
+		id := or.resolve(toResolve)
+		if len(id) == 0 {
+			continue
+		}
+		typ := or.resolveType(id)
+		if lsc.lockerTypeNeeded(objectTypeString(typ)) {
 			if err := states.stateChange(id, act); err != nil {
-				lsc.reports = append(lsc.reports, CheckReport{Err: err, Pos: op.object.Pos()})
+				lsc.reports = append(lsc.reports, CheckReport{Err: err, Pos: op.Pos()})
 			}
 		}
 	}
-}
-
-func objectTypeString(obj types.Object) string {
-	var strType string
-	for obj != nil {
-		typ := obj.Type()
-		switch typed := typ.(type) {
-		case *types.Named:
-			strType = typed.String()
-			obj = nil
-		case *types.Signature:
-			if results := typed.Results(); results.Len() == 1 {
-				obj = results.At(0)
-			} else {
-				obj = nil
-			}
-		case *types.Pointer:
-			if named, ok := typed.Elem().(*types.Named); ok {
-				strType = named.String()
-			}
-			obj = nil
-		case *types.Struct:
-			obj = nil
-		default:
-			obj = nil
-		}
-	}
-	return strType
-}
-
-func resolveObjectField(obj types.Object, field string) types.Object {
-	typ := obj.Type()
-	for {
-		if _, ok := typ.(*types.Named); ok {
-			typ = typ.Underlying()
-		} else {
-			break
-		}
-	}
-	st, ok := typ.(*types.Struct)
-	if !ok {
-		return nil
-	}
-	for i := 0; i < st.NumFields(); i++ {
-		v := st.Field(i)
-		if v.Name() == field {
-			return v
-		}
-	}
-	return nil
 }
